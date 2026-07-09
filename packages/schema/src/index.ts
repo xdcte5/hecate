@@ -48,3 +48,14 @@ export {
   emptyRelayConfig,
   type RelayConfig,
 } from "./relay-config.js";
+
+export {
+  ManifestEntrySchema,
+  AdapterManifestSchema,
+  RelayLockSchema,
+  RELAY_LOCK_VERSION,
+  emptyRelayLock,
+  type ManifestEntry,
+  type AdapterManifest,
+  type RelayLock,
+} from "./adapter-manifest.js";

@@ -5,6 +5,8 @@ import { registerSessionCommands } from "./commands/session.js";
 import { registerHandoffCommands } from "./commands/handoff.js";
 import { registerTraceCommands } from "./commands/trace.js";
 import { registerDoctorCommands } from "./commands/doctor.js";
+import { registerInitCommands } from "./commands/init.js";
+import { registerBuildCommands } from "./commands/build.js";
 
 const program = new Command();
 const getCwd = () => process.cwd();
@@ -14,6 +16,8 @@ program
   .description("Personal dev agent mesh — session, registry, handoff")
   .version("0.0.1");
 
+registerInitCommands(program, getCwd);
+registerBuildCommands(program, getCwd);
 registerRegistryCommands(program, getCwd);
 registerSessionCommands(program, getCwd);
 registerHandoffCommands(program, getCwd);

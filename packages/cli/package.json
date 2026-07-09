@@ -12,10 +12,12 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@relay/adapters": "workspace:*",
     "@relay/registry": "workspace:*",
     "@relay/schema": "workspace:*",
     "@relay/session": "workspace:*",
-    "commander": "^14.0.3"
+    "commander": "^14.0.3",
+    "yaml": "^2.8.3"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",

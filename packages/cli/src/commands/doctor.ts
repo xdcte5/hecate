@@ -1,5 +1,31 @@
 import { Command } from "commander";
 import { evaluateBrownfieldKpis, SessionStore, validateSession } from "@relay/session";
+import { detectDrift, readRelayLock } from "@relay/adapters";
+
+/**
+ * Check manifest-owned generated files against relay.lock. Returns true when
+ * clean (or nothing to check yet), false when drift was found.
+ */
+async function checkBuildDrift(cwd: string): Promise<boolean> {
+  const lock = await readRelayLock(cwd);
+  if (!lock) {
+    console.log("No relay.lock found. Run `relay build --all` first.");
+    return true;
+  }
+
+  const drift = await detectDrift(cwd, lock);
+  if (drift.length === 0) {
+    console.log(`PASS: ${lock.adapters.length} harness(es), no generated-file drift`);
+    return true;
+  }
+
+  console.error(`FAIL: ${drift.length} generated file(s) drifted from relay.lock`);
+  for (const finding of drift) {
+    console.error(`  [${finding.harness}] ${finding.kind}: ${finding.path}`);
+  }
+  console.error("Re-run `relay build` to regenerate, or edit relay/ instead of the output.");
+  return false;
+}
 
 function isActiveSessionFlag(value: string | true | undefined): value is true | "" {
   return value === true || value === "";
@@ -26,13 +52,16 @@ export function registerDoctorCommands(program: Command, getCwd: () => string): 
     .description("Diagnose relay setup")
     .option("--session [id]", "Validate session integrity (active session if no id)")
     .option("--kpi", "Run Brownfield KPI checks on active session")
-    .action(async (options: { session?: string | true; kpi?: boolean }) => {
-      if (options.session === undefined && !options.kpi) {
-        console.log("Nothing to check. Try: relay doctor --session or relay doctor --kpi");
-        return;
-      }
-
+    .option("--build", "Check generated files against relay.lock (default)")
+    .action(async (options: { session?: string | true; kpi?: boolean; build?: boolean }) => {
       const cwd = getCwd();
+
+      // Default check (no flags) is build/drift; explicit --build too.
+      if (options.build || (options.session === undefined && !options.kpi)) {
+        const clean = await checkBuildDrift(cwd);
+        if (!clean) process.exitCode = 1;
+        if (!options.session && !options.kpi) return;
+      }
 
       if (options.kpi) {
         const store = new SessionStore({ rootDir: cwd });

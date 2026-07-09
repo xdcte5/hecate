@@ -23,12 +23,12 @@ Legend: ☐ pending · ◐ in progress · ☑ done
 
 ### Sprint 1 — Adapter foundation + Claude/Codex
 
-- ☐ `packages/schema`: `AdapterManifest` + `RelayLock` Zod types (Week 0 stub, now real)
-- ☐ `packages/adapters`: `Adapter` interface + `BaseAdapter` (documented in README)
-- ☐ `packages/adapters`: manifest writer + `relay.lock` sha-256 checksums
-- ☐ Claude Code adapter → golden test in `fixtures/golden/claude/`
-- ☐ Codex adapter → golden test in `fixtures/golden/codex/`
-- ☐ CLI: `relay init` (detects installed binaries), `relay build`, `relay doctor` drift check
+- ☑ `packages/schema`: `AdapterManifest` + `RelayLock` Zod types (Week 0 stub, now real)
+- ☑ `packages/adapters`: `Adapter` interface + `BaseAdapter` (documented in README)
+- ☑ `packages/adapters`: manifest writer + `relay.lock` sha-256 checksums
+- ☑ Claude Code adapter → golden test in `fixtures/golden/claude/`
+- ☑ Codex adapter → golden test in `fixtures/golden/codex/`
+- ☑ CLI: `relay init` (detects installed binaries), `relay build`, `relay doctor` drift check
 
 **Exit:** `relay init && relay build --harness claude` produces valid output; doctor is clean.
 

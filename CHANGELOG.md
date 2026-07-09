@@ -13,7 +13,18 @@ Harness Fabric track lives in [docs/dev-b-track.md](./docs/dev-b-track.md).
 
 ### Added — Harness Fabric (Dev B)
 
-_Nothing yet — Sprint 1 in progress._
+**Sprint 1 — Adapter foundation + Claude/Codex**
+
+- `@relay/schema`: `AdapterManifest`, `ManifestEntry`, `RelayLock` types + `emptyRelayLock`.
+- `@relay/adapters`: new package — `Adapter` interface, `BaseAdapter`, `RelaySource`
+  reader, `ClaudeAdapter`, `CodexAdapter`, `mcp-transform` (Claude JSON + Codex TOML),
+  manifest writer with sha-256 checksums, `relay.lock` reader/writer, `detectDrift`,
+  and binary detection for `relay init`.
+- `@relay/cli`: `relay init` (scaffolds `relay/`, enables only detected harnesses),
+  `relay build [--harness <id>|--all]`, and `relay doctor --build` (default) drift check.
+- Golden tests: `fixtures/golden/claude/`, `fixtures/golden/codex/`
+  (regenerate with `UPDATE_GOLDEN=1`).
+- `packages/adapters/README.md` documents the adapter model and matrix.
 
 ### Added — Mesh Brain (Dev A)
 
