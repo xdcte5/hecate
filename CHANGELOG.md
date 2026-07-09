@@ -54,6 +54,16 @@ Harness Fabric track lives in [docs/dev-b-track.md](./docs/dev-b-track.md).
 - Verified end-to-end: a decision recorded via the stdio MCP server lands in
   `events.jsonl` and the next handoff.
 
+**Sprint 4 — Integration + docs**
+
+- `@relay/cli`: `relay migrate --from` now also handles `claude` and `codex` harness
+  layouts (CLAUDE.md / AGENTS.md + agents/skills/commands + MCP config, TOML parsed back
+  to JSON).
+- Docs: `docs/adapter-matrix.md` (source→output + MCP formats + drift model) and
+  `docs/quickstart.md` (< 15 min first handoff).
+- Cross-track E2E test (`packages/cli/src/e2e.test.ts`): session start → build → inject
+  in all 4 harnesses → doctor clean → handoff → rebuild, driving the real CLI.
+
 ### Added — Mesh Brain (Dev A)
 
 - `@relay/schema`: RHP v1, HandoffBundle, registry, session-policy, relay config Zod types.

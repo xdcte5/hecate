@@ -32,6 +32,30 @@ describe("relay migrate --from agents-md", () => {
     expect(readFileSync(join(tmp, "relay/registry.yaml"), "utf8")).toContain("claude-code");
   });
 
+  it("imports a Claude layout (CLAUDE.md + .claude/ + .mcp.json)", () => {
+    tmp = mkdtempSync(join(os.tmpdir(), "relay-migrate-"));
+    writeFileSync(join(tmp, "CLAUDE.md"), "# Claude rules\n");
+    mkdirSync(join(tmp, ".claude/agents"), { recursive: true });
+    writeFileSync(join(tmp, ".claude/agents/rev.md"), "# rev\n");
+    writeFileSync(join(tmp, ".mcp.json"), '{"mcpServers":{"foo":{"command":"foo","args":[]}}}');
+
+    run(tmp, ["migrate", "--from", "claude"]);
+    expect(readFileSync(join(tmp, "relay/instructions.md"), "utf8")).toContain("Claude rules");
+    expect(readFileSync(join(tmp, "relay/agents/rev.md"), "utf8")).toContain("rev");
+    expect(readFileSync(join(tmp, "relay/mcp.json"), "utf8")).toContain("foo");
+  });
+
+  it("imports a Codex config.toml into relay/mcp.json", () => {
+    tmp = mkdtempSync(join(os.tmpdir(), "relay-migrate-"));
+    writeFileSync(join(tmp, "AGENTS.md"), "# Codex rules\n");
+    mkdirSync(join(tmp, ".codex"), { recursive: true });
+    writeFileSync(join(tmp, ".codex/config.toml"), '[mcp_servers.bar]\ncommand = "bar"\nargs = []\n');
+
+    run(tmp, ["migrate", "--from", "codex"]);
+    const mcp = JSON.parse(readFileSync(join(tmp, "relay/mcp.json"), "utf8"));
+    expect(mcp.mcpServers.bar.command).toBe("bar");
+  });
+
   it("errors on an unsupported source", () => {
     tmp = mkdtempSync(join(os.tmpdir(), "relay-migrate-"));
     expect(() => run(tmp, ["migrate", "--from", "nonsense"])).toThrow();

@@ -56,10 +56,10 @@ Legend: ☐ pending · ◐ in progress · ☑ done
 
 ### Sprint 4 — Integration + docs
 
-- ☐ `relay migrate --from harness` (Claude/Codex layout → `relay/`)
-- ☐ `docs/adapter-matrix.md` + per-adapter READMEs
-- ☐ `docs/quickstart.md` (< 15 min first handoff)
-- ☐ E2E: session → handoff (Dev A) → build → inject visible in all harnesses
+- ☑ `relay migrate --from harness` (Claude/Codex layout → `relay/`)
+- ☑ `docs/adapter-matrix.md` + per-adapter READMEs
+- ☑ `docs/quickstart.md` (< 15 min first handoff)
+- ☑ E2E: session → handoff (Dev A) → build → inject visible in all harnesses
 
 **Exit:** fresh user completes a handoff in < 15 min; adapters round-trip cleanly.
 

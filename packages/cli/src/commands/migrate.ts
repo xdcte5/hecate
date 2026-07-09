@@ -2,10 +2,47 @@ import { existsSync } from "node:fs";
 import { copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Command } from "commander";
+import { fromCodexToml, toClaudeJson } from "@relay/adapters";
 import { DEFAULT_CARDS, writeBaseScaffold } from "../scaffold.js";
 
-type MigrateSource = "agents-md";
-const SUPPORTED: MigrateSource[] = ["agents-md"];
+const SUPPORTED = ["agents-md", "claude", "codex"] as const;
+type MigrateSource = (typeof SUPPORTED)[number];
+
+interface SourcePlan {
+  /** Instruction file to import into relay/instructions.md. */
+  instructions: string;
+  /** Markdown dirs to copy: [from, relaySubdir]. */
+  markdownDirs: [string, string][];
+  /** Optional MCP import. */
+  mcp?: { path: string; format: "json" | "codex-toml" };
+}
+
+function planFor(source: MigrateSource): SourcePlan {
+  switch (source) {
+    case "agents-md":
+      return {
+        instructions: "AGENTS.md",
+        markdownDirs: [["agents", "agents"], ["skills", "skills"], ["prompts", "commands"]],
+        mcp: { path: "mcp.json", format: "json" },
+      };
+    case "claude":
+      return {
+        instructions: "CLAUDE.md",
+        markdownDirs: [
+          [".claude/agents", "agents"],
+          [".claude/skills", "skills"],
+          [".claude/commands", "commands"],
+        ],
+        mcp: { path: ".mcp.json", format: "json" },
+      };
+    case "codex":
+      return {
+        instructions: "AGENTS.md",
+        markdownDirs: [[".codex/skills", "skills"]],
+        mcp: { path: ".codex/config.toml", format: "codex-toml" },
+      };
+  }
+}
 
 async function importMarkdownDir(from: string, to: string): Promise<number> {
   if (!existsSync(from)) return 0;
@@ -19,48 +56,48 @@ async function importMarkdownDir(from: string, to: string): Promise<number> {
   return count;
 }
 
-/**
- * Import an existing AGENTS.md project into a `relay/` source: the AGENTS.md
- * body becomes `relay/instructions.md`, and any sibling `agents/`, `skills/`,
- * `prompts/`, and `mcp.json` are pulled in. Base registry/policy are scaffolded
- * where missing. Existing `relay/` files are preserved unless `--force`.
- */
-async function migrateFromAgentsMd(cwd: string, force: boolean): Promise<void> {
-  const relayDir = join(cwd, "relay");
-  const agentsMd = join(cwd, "AGENTS.md");
+async function importMcp(cwd: string, relayDir: string, plan: SourcePlan): Promise<number> {
+  if (!plan.mcp) return 0;
+  const src = join(cwd, plan.mcp.path);
+  if (!existsSync(src)) return 0;
 
-  if (!existsSync(agentsMd)) {
-    throw new Error("No AGENTS.md found in the current directory.");
+  const dest = join(relayDir, "mcp.json");
+  if (plan.mcp.format === "codex-toml") {
+    const config = fromCodexToml(await readFile(src, "utf8"));
+    await writeFile(dest, toClaudeJson(config), "utf8");
+  } else {
+    await copyFile(src, dest);
+  }
+  return 1;
+}
+
+async function migrate(cwd: string, source: MigrateSource, force: boolean): Promise<void> {
+  const relayDir = join(cwd, "relay");
+  const plan = planFor(source);
+  const instructionsSrc = join(cwd, plan.instructions);
+
+  if (!existsSync(instructionsSrc)) {
+    throw new Error(`No ${plan.instructions} found in the current directory.`);
   }
 
-  // Capture whether the user already had hand-written instructions *before*
-  // scaffolding creates a default placeholder.
   const instructionsPath = join(relayDir, "instructions.md");
   const hadInstructions = existsSync(instructionsPath);
 
   await writeBaseScaffold(relayDir, DEFAULT_CARDS, { overwrite: false });
 
   if (force || !hadInstructions) {
-    await writeFile(instructionsPath, await readFile(agentsMd, "utf8"), "utf8");
+    await writeFile(instructionsPath, await readFile(instructionsSrc, "utf8"), "utf8");
   }
 
-  const agents = await importMarkdownDir(join(cwd, "agents"), join(relayDir, "agents"));
-  const skills = await importMarkdownDir(join(cwd, "skills"), join(relayDir, "skills"));
-  const prompts = await importMarkdownDir(join(cwd, "prompts"), join(relayDir, "commands"));
-
-  let mcp = 0;
-  const mcpSource = existsSync(join(cwd, "mcp.json"))
-    ? join(cwd, "mcp.json")
-    : existsSync(join(cwd, ".mcp.json"))
-      ? join(cwd, ".mcp.json")
-      : null;
-  if (mcpSource) {
-    await copyFile(mcpSource, join(relayDir, "mcp.json"));
-    mcp = 1;
+  const counts: Record<string, number> = {};
+  for (const [from, sub] of plan.markdownDirs) {
+    counts[sub] = (counts[sub] ?? 0) + (await importMarkdownDir(join(cwd, from), join(relayDir, sub)));
   }
+  const mcp = await importMcp(cwd, relayDir, plan);
 
-  console.log("Migrated AGENTS.md → relay/instructions.md");
-  console.log(`Imported: ${agents} agent(s), ${skills} skill(s), ${prompts} prompt(s), ${mcp} mcp config`);
+  console.log(`Migrated ${plan.instructions} → relay/instructions.md`);
+  const parts = Object.entries(counts).map(([k, v]) => `${v} ${k}`);
+  console.log(`Imported: ${parts.join(", ")}, ${mcp} mcp config`);
   console.log("Next: review relay/, then `relay build --all`.");
 }
 
@@ -72,11 +109,11 @@ export function registerMigrateCommands(program: Command, getCwd: () => string):
     .option("--force", "Overwrite relay/instructions.md if it exists")
     .action(async (options: { from: string; force?: boolean }) => {
       const cwd = getCwd();
-      if (options.from !== "agents-md") {
+      if (!SUPPORTED.includes(options.from as MigrateSource)) {
         console.error(`Unsupported --from: ${options.from}. Supported: ${SUPPORTED.join(", ")}`);
         process.exitCode = 1;
         return;
       }
-      await migrateFromAgentsMd(cwd, options.force ?? false);
+      await migrate(cwd, options.from as MigrateSource, options.force ?? false);
     });
 }
