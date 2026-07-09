@@ -1,4 +1,4 @@
-# Relay
+# Relay (hecate)
 
 Personal dev agent mesh — one Product Session across Claude Code, Codex, Cursor, and Pi.
 
