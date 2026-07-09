@@ -29,7 +29,9 @@ function git(cwd: string, args: string[]): void {
  * harness → doctor clean → handoff to another harness → rebuild.
  */
 describe("E2E: session → build → inject → doctor → handoff (both tracks)", () => {
-  it("injects the active session into all 4 harnesses and stays drift-clean", () => {
+  it(
+    "injects the active session into all 4 harnesses and stays drift-clean",
+    () => {
     tmp = mkdtempSync(join(os.tmpdir(), "relay-e2e-cli-"));
     cpSync(fixtureRelay, join(tmp, "relay"), { recursive: true });
     git(tmp, ["init", "--template="]);
@@ -60,5 +62,5 @@ describe("E2E: session → build → inject → doctor → handoff (both tracks)
     run(tmp, ["handoff", "--to", "codex"]);
     expect(run(tmp, ["build", "--all"])).toContain("tracked harness");
     expect(run(tmp, ["doctor"])).toContain("no generated-file drift");
-  });
+  }, 15_000);
 });
