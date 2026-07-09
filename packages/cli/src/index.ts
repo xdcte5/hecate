@@ -16,6 +16,7 @@ import { registerMcpCommands } from "./commands/mcp.js";
 import { registerMigrateCommands } from "./commands/migrate.js";
 import { registerHarborExecCommands } from "./commands/harbor-exec.js";
 import { registerLoginCommands } from "./commands/login.js";
+import { registerConfigCommands } from "./commands/config.js";
 
 const program = new Command();
 const getCwd = () => process.cwd();
@@ -26,6 +27,7 @@ program
   .version("0.0.1");
 
 registerLoginCommands(program, getCwd);
+registerConfigCommands(program, getCwd);
 registerInitCommands(program, getCwd);
 registerBuildCommands(program, getCwd);
 registerWatchCommands(program, getCwd);

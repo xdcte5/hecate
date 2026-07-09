@@ -10,8 +10,33 @@ import { groupStepsByWave } from "./plan.js";
 import { resolveHarnessWithFallback } from "./resolve-fallback.js";
 import { saveRunState } from "./runner-state.js";
 import type { RunState, RunStep } from "./types.js";
-import { verifyImplementWave } from "./verify.js";
+import { verifyImplementWave, runVerifyCommand } from "./verify.js";
 import { formatModelLabel } from "./launch-args.js";
+
+/**
+ * Run `fn` over `items` with at most `limit` in flight at once, preserving
+ * result order. `limit >= items.length` degrades to a plain `Promise.all`.
+ */
+async function runWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  if (limit >= items.length) {
+    return Promise.all(items.map((item, index) => fn(item, index)));
+  }
+  const results = new Array<R>(items.length);
+  let next = 0;
+  async function worker(): Promise<void> {
+    while (true) {
+      const index = next++;
+      if (index >= items.length) return;
+      results[index] = await fn(items[index]!, index);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+  return results;
+}
 
 const HARNESS_LABEL: Record<HarnessId, string> = {
   "claude-code": "Claude Code",
@@ -39,6 +64,10 @@ export type ExecutePlanOptions = {
   registry: Registry;
   failover: HarnessId[];
   modelOverrides?: Partial<Record<HarnessId, string>>;
+  /** Max agents to run at once within a wave (default: whole wave in parallel). */
+  maxConcurrency?: number;
+  /** Verification gate between waves (default: enabled, file-change check). */
+  verify?: { enabled?: boolean; command?: string };
   onLine?: (line: string) => void;
   signal?: AbortSignal;
 };
@@ -200,8 +229,11 @@ export async function executePlan(options: ExecutePlanOptions): Promise<ExecuteP
       return { ok: false, state };
     }
 
-    if (wave > 0) {
-      const verify = await verifyImplementWave(cwd);
+    const verifyEnabled = options.verify?.enabled !== false;
+    if (wave > 0 && verifyEnabled) {
+      const verify = options.verify?.command
+        ? await runVerifyCommand(cwd, options.verify.command)
+        : await verifyImplementWave(cwd);
       if (!verify.ok) {
         for (const step of waveSteps) {
           step.status = "skipped";
@@ -219,19 +251,21 @@ export async function executePlan(options: ExecutePlanOptions): Promise<ExecuteP
     state.currentStepIndex = globalIndex;
     await saveRunState(cwd, state);
 
+    const limit = options.maxConcurrency && options.maxConcurrency > 0
+      ? options.maxConcurrency
+      : waveSteps.length;
     const parallel = waveSteps.length > 1;
     if (parallel) {
+      const limitNote = limit < waveSteps.length ? ` (max ${limit} at once)` : "";
       push(
         lines,
-        `▶ Wave ${wave}: ${waveSteps.length} agents in parallel`,
+        `▶ Wave ${wave}: ${waveSteps.length} agents in parallel${limitNote}`,
         onLine,
       );
     }
 
-    const outcomes = await Promise.all(
-      waveSteps.map((step, offset) =>
-        runSingleStep(options, step, globalIndex + offset, state.steps.length, lines),
-      ),
+    const outcomes = await runWithConcurrency(waveSteps, limit, (step, offset) =>
+      runSingleStep(options, step, globalIndex + offset, state.steps.length, lines),
     );
 
     if (!outcomes.every(Boolean)) {

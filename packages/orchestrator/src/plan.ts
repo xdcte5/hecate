@@ -68,6 +68,32 @@ export function buildRunPlan(goal: string, router: ThinRouter): RunPlan {
   return { goal: trimmed, steps };
 }
 
+/**
+ * Apply `relay/orchestrator.yaml` routing overrides (step-kind → harness).
+ * A key matches a step whose id equals it or starts with `<key>-` (so
+ * `implement` covers `implement-frontend`/`implement-backend`). The model is
+ * re-routed for the overridden harness.
+ */
+export function applyRoutingOverrides(
+  plan: RunPlan,
+  overrides: Record<string, HarnessId> | undefined,
+  router: ThinRouter,
+): RunPlan {
+  if (!overrides || Object.keys(overrides).length === 0) return plan;
+
+  const steps = plan.steps.map((step) => {
+    for (const [kind, harness] of Object.entries(overrides)) {
+      if (step.id === kind || step.id.startsWith(`${kind}-`)) {
+        const modelRoute = router.routeModel(step.task, harness);
+        return { ...step, harness, model: modelRoute.modelId, modelReason: modelRoute.reason };
+      }
+    }
+    return step;
+  });
+
+  return { ...plan, steps };
+}
+
 export function groupStepsByWave<T extends { wave: number }>(steps: T[]): Map<number, T[]> {
   const waves = new Map<number, T[]>();
   for (const step of steps) {

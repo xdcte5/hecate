@@ -19,6 +19,23 @@ export async function listChangedFiles(cwd: string): Promise<string[]> {
   }
 }
 
+/**
+ * Run a user-configured verification command (from `relay/orchestrator.yaml`).
+ * Passing means exit code 0. A stricter gate than the file-change check.
+ */
+export async function runVerifyCommand(
+  cwd: string,
+  command: string,
+): Promise<{ ok: boolean; message: string; files: string[] }> {
+  try {
+    await execFileAsync("sh", ["-c", command], { cwd, maxBuffer: 4 * 1024 * 1024 });
+    return { ok: true, message: `verify passed (${command})`, files: [] };
+  } catch (err) {
+    const detail = (err as { stderr?: string }).stderr?.trim().split("\n").pop() ?? String(err);
+    return { ok: false, message: `verify failed (${command}): ${detail}`, files: [] };
+  }
+}
+
 export async function verifyImplementWave(
   cwd: string,
   minFiles = 1,

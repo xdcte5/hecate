@@ -12,6 +12,7 @@ import {
   type LocalConfig,
 } from "./local-config.js";
 import { discoverHarnessModels, formatModelChoices, promptModelSelection } from "./model-picker.js";
+import { loadOrchestratorConfig } from "../orchestrator-config.js";
 import {
   formatRelayBanner,
   formatTranscriptEntry,
@@ -40,6 +41,7 @@ type RuntimeState = {
 export async function runRelayTui(options: RelayTuiOptions): Promise<void> {
   const { cwd } = options;
   let localConfig = await readLocalConfig(cwd);
+  const orchestratorConfig = await loadOrchestratorConfig(cwd);
   const { registry } = await loadRelayConfig(cwd);
 
   const scan = await scanLocalAgents(registry);
@@ -253,8 +255,12 @@ export async function runRelayTui(options: RelayTuiOptions): Promise<void> {
           signal: abortController.signal,
           enabledAgents:
             localConfig.enabledAgents.length > 0 ? localConfig.enabledAgents : undefined,
-          modelOverrides: localConfig.modelOverrides,
+          // orchestrator.yaml models are the base; interactive picks win.
+          modelOverrides: { ...orchestratorConfig.models, ...localConfig.modelOverrides },
           modelMode: localConfig.modelMode,
+          maxConcurrency: orchestratorConfig.maxConcurrency,
+          verify: orchestratorConfig.verify,
+          routingOverrides: orchestratorConfig.routing,
           onLine: (row) => emit(row),
         });
 

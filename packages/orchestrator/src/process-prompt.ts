@@ -3,7 +3,7 @@ import type { HarnessId } from "@relay/schema";
 import { SessionStore } from "@relay/session";
 import { executePlan } from "./execute-plan.js";
 import { filterEnabledAgents } from "./filter-agents.js";
-import { buildRunPlan } from "./plan.js";
+import { applyRoutingOverrides, buildRunPlan } from "./plan.js";
 import { initRunState, saveRunState, loadRunState } from "./runner-state.js";
 import type { RunState, RunStep } from "./types.js";
 import { formatModelLabel } from "./launch-args.js";
@@ -19,6 +19,10 @@ export type ProcessPromptOptions = {
   enabledAgents?: HarnessId[];
   modelOverrides?: Partial<Record<HarnessId, string>>;
   modelMode?: "auto" | "manual";
+  /** Deep-customization knobs from `relay/orchestrator.yaml`. */
+  maxConcurrency?: number;
+  verify?: { enabled?: boolean; command?: string };
+  routingOverrides?: Record<string, HarnessId>;
 };
 
 const HARNESS_LABEL: Record<HarnessId, string> = {
@@ -70,7 +74,7 @@ export async function processPrompt(
     push(lines, `Session: "${trimmed}"`, onLine);
   }
 
-  const plan = buildRunPlan(trimmed, router);
+  const plan = applyRoutingOverrides(buildRunPlan(trimmed, router), options.routingOverrides, router);
   const steps: RunStep[] = plan.steps.map((step) => {
     const override = modelOverrides?.[step.harness];
     if (override) {
@@ -108,6 +112,8 @@ export async function processPrompt(
     registry,
     failover,
     modelOverrides,
+    maxConcurrency: options.maxConcurrency,
+    verify: options.verify,
     onLine: (line) => {
       push(lines, line, onLine);
     },
