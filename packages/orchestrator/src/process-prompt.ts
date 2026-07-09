@@ -1,12 +1,12 @@
-import { buildProject } from "@relay/adapters";
 import { loadRelayConfig, ThinRouter } from "@relay/registry";
 import type { HarnessId } from "@relay/schema";
-import { SessionStore, getHandoffPath } from "@relay/session";
-import { runHarnessAuto } from "./auto-run.js";
+import { SessionStore } from "@relay/session";
+import { executePlan } from "./execute-plan.js";
+import { filterEnabledAgents } from "./filter-agents.js";
 import { buildRunPlan } from "./plan.js";
-import { resolveHarnessWithFallback } from "./resolve-fallback.js";
 import { initRunState, saveRunState, loadRunState } from "./runner-state.js";
 import type { RunState, RunStep } from "./types.js";
+import { formatModelLabel } from "./launch-args.js";
 
 export type PromptResult = {
   ok: boolean;
@@ -16,6 +16,9 @@ export type PromptResult = {
 export type ProcessPromptOptions = {
   onLine?: (line: string) => void;
   signal?: AbortSignal;
+  enabledAgents?: HarnessId[];
+  modelOverrides?: Partial<Record<HarnessId, string>>;
+  modelMode?: "auto" | "manual";
 };
 
 const HARNESS_LABEL: Record<HarnessId, string> = {
@@ -29,6 +32,12 @@ function label(id: HarnessId): string {
   return HARNESS_LABEL[id] ?? id;
 }
 
+function formatStepModel(step: RunStep): string {
+  if (!step.model) return "";
+  const short = formatModelLabel(step.model);
+  return ` — model: ${step.model} (${short})`;
+}
+
 function push(lines: string[], line: string, onLine?: (line: string) => void): void {
   lines.push(line);
   onLine?.(line);
@@ -40,13 +49,18 @@ export async function processPrompt(
   prompt: string,
   options: ProcessPromptOptions = {},
 ): Promise<PromptResult> {
-  const { onLine, signal } = options;
+  const { onLine, signal, enabledAgents, modelOverrides } = options;
   const trimmed = prompt.trim();
   if (!trimmed) return { ok: false, lines: ["(empty prompt)"] };
 
   const lines: string[] = [];
   const { registry, sessionPolicy } = await loadRelayConfig(cwd);
-  const router = new ThinRouter(registry, sessionPolicy);
+  const failover = filterEnabledAgents(sessionPolicy.failover, enabledAgents);
+  const registryForRouter =
+    enabledAgents && enabledAgents.length > 0
+      ? { harnesses: registry.harnesses.filter((card) => enabledAgents.includes(card.id)) }
+      : registry;
+  const router = new ThinRouter(registryForRouter, { ...sessionPolicy, failover });
   const store = new SessionStore({ rootDir: cwd });
 
   let session = await store.getActive();
@@ -56,106 +70,50 @@ export async function processPrompt(
   }
 
   const plan = buildRunPlan(trimmed, router);
-  const steps: RunStep[] = plan.steps.map((step) => ({
-    ...step,
-    status: "pending",
-  }));
+  const steps: RunStep[] = plan.steps.map((step) => {
+    const override = modelOverrides?.[step.harness];
+    if (override) {
+      return { ...step, status: "pending" as const, model: override, modelReason: "default" };
+    }
+    return { ...step, status: "pending" as const };
+  });
 
   let state: RunState = initRunState(trimmed, session.sessionId, steps);
   await saveRunState(cwd, state);
 
-  push(lines, `Plan (${steps.length} steps):`, onLine);
-  for (const [i, s] of steps.entries()) {
-    push(lines, `  ${i + 1}. ${label(s.harness)} — ${s.task}`, onLine);
+  const waves = new Map<number, RunStep[]>();
+  for (const step of steps) {
+    const list = waves.get(step.wave) ?? [];
+    list.push(step);
+    waves.set(step.wave, list);
+  }
+
+  push(lines, `Plan (${steps.length} steps, ${waves.size} wave(s)):`, onLine);
+  for (const [wave, waveSteps] of [...waves.entries()].sort((a, b) => a[0] - b[0])) {
+    const parallel = waveSteps.length > 1 ? ` [parallel]` : "";
+    push(lines, `  Wave ${wave}${parallel}:`, onLine);
+    for (const s of waveSteps) {
+      const reason =
+        s.reason === "ability-match" ? "ability-match" : "default failover";
+      push(lines, `    • ${label(s.harness)} (${reason})${formatStepModel(s)} — ${s.task}`, onLine);
+    }
   }
   push(lines, "", onLine);
 
-  for (let i = 0; i < state.steps.length; i++) {
-    if (signal?.aborted) {
-      push(lines, "Cancelled.", onLine);
-      return { ok: false, lines };
-    }
+  const result = await executePlan({
+    cwd,
+    state,
+    store,
+    registry,
+    failover,
+    modelOverrides,
+    onLine: (line) => {
+      push(lines, line, onLine);
+    },
+    signal,
+  });
 
-    state.currentStepIndex = i;
-    const step = state.steps[i]!;
-    step.status = "running";
-    step.startedAt = new Date().toISOString();
-    await saveRunState(cwd, state);
-
-    push(lines, `▶ Step ${i + 1}/${state.steps.length}: ${label(step.harness)} running…`, onLine);
-
-    const resolved = await resolveHarnessWithFallback(
-      registry,
-      step.harness,
-      sessionPolicy.failover,
-    );
-
-    if (!resolved) {
-      step.status = "failed";
-      step.error = "No agent CLI found on PATH";
-      step.finishedAt = new Date().toISOString();
-      await saveRunState(cwd, state);
-      push(lines, `  ✗ No agent CLI found (install claude or codex)`, onLine);
-      return { ok: false, lines };
-    }
-
-    if (resolved.fallback) {
-      push(
-        lines,
-        `  ↪ ${label(step.harness)} not installed — using ${label(resolved.harness)} (${resolved.binary})`,
-        onLine,
-      );
-      step.harness = resolved.harness;
-    } else {
-      push(lines, `  agent: ${resolved.binary}`, onLine);
-    }
-
-    step.binary = resolved.binary;
-    await store.prepareHandoff(session.sessionId, step.harness);
-    const handoffPath = getHandoffPath(session.sessionId);
-
-    const result = await runHarnessAuto({
-      cwd,
-      harness: step.harness,
-      binary: resolved.binary,
-      task: step.task,
-      handoffPath,
-      signal,
-      onOutput: (line) => {
-        onLine?.(`  │ ${line}`);
-      },
-    });
-
-    if (!result.ok) {
-      step.status = "failed";
-      step.error = result.summary;
-      step.finishedAt = new Date().toISOString();
-      await saveRunState(cwd, state);
-      push(lines, `  ✗ ${result.summary}`, onLine);
-      if (result.output) {
-        for (const row of result.output.split("\n")) {
-          push(lines, `  │ ${row}`, onLine);
-        }
-      }
-      return { ok: false, lines };
-    }
-
-    step.status = "done";
-    step.finishedAt = new Date().toISOString();
-    await saveRunState(cwd, state);
-    push(lines, `  ✓ ${result.summary}`, onLine);
-
-    try {
-      await buildProject(cwd);
-      push(lines, `  ↻ synced harness files`, onLine);
-    } catch {
-      // non-fatal
-    }
-  }
-
-  push(lines, "", onLine);
-  push(lines, "Done — all steps complete.", onLine);
-  return { ok: true, lines };
+  return { ok: result.ok, lines };
 }
 
 export async function getPromptStatus(cwd: string): Promise<string[]> {
@@ -170,7 +128,8 @@ export async function getPromptStatus(cwd: string): Promise<string[]> {
     `Goal: ${state.goal}`,
     ...state.steps.map((step, i) => {
       const marker = i === state.currentStepIndex ? "►" : " ";
-      return `${marker} ${i + 1}. ${label(step.harness)} — ${step.status}`;
+      const wave = step.wave !== undefined ? ` w${step.wave}` : "";
+      return `${marker} ${i + 1}.${wave} ${label(step.harness)} — ${step.status}`;
     }),
   ];
 }

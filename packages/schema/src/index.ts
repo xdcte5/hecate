@@ -23,8 +23,10 @@ export {
 
 export {
   HarnessCardSchema,
+  ModelCardSchema,
   RegistrySchema,
   type HarnessCard,
+  type ModelCard,
   type Registry,
 } from "./registry.js";
 

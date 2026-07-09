@@ -29,14 +29,14 @@ describe("parseHandoffTarget", () => {
 });
 
 describe("resolveAutoHandoffTarget", () => {
-  it("routes fix React component to cursor", async () => {
+  it("routes fix React component to cursor for frontend+debug abilities", async () => {
     const { harness, routing } = await resolveAutoHandoffTarget(
       fixtureRoot,
       "fix React component",
     );
 
     expect(harness).toBe("cursor");
-    expect(formatRoutingReason(routing)).toContain("routing-rule");
+    expect(formatRoutingReason(routing)).toContain("ability-match");
   });
 
   it("routes write unit tests to codex", async () => {

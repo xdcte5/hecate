@@ -14,6 +14,7 @@ import { registerBuildCommands } from "./commands/build.js";
 import { registerWatchCommands } from "./commands/watch.js";
 import { registerMcpCommands } from "./commands/mcp.js";
 import { registerMigrateCommands } from "./commands/migrate.js";
+import { registerHarborExecCommands } from "./commands/harbor-exec.js";
 
 const program = new Command();
 const getCwd = () => process.cwd();
@@ -36,6 +37,7 @@ registerDoctorCommands(program, getCwd);
 registerDashCommands(program, getCwd);
 registerChatCommands(program, getCwd);
 registerRunCommands(program, getCwd);
+registerHarborExecCommands(program, getCwd);
 
 const userArgs = process.argv.slice(2);
 if (userArgs.length === 0 && process.stdin.isTTY) {

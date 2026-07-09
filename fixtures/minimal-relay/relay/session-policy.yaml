@@ -1,25 +1,11 @@
-routing:
-  - pattern: "(?i)(unit test|write tests|vitest|jest|mocha)"
-    harness: codex
-    description: Test writing tasks go to Codex
-
-  - pattern: "(?i)(react|component|jsx|tsx|frontend)"
-    harness: cursor
-    description: Frontend and React work goes to Cursor
-
-  - pattern: "(?i)(refactor|architecture|system design)"
-    harness: claude-code
-    description: Architecture and refactoring goes to Claude Code
-
-  - pattern: "(?i)\\b(script|automation|cli|shell)\\b"
-    harness: pi
-    description: Scripts and automation go to Pi
+# Routing is ability-based via harness cards in registry.yaml.
+routing: []
 
 failover:
+  - pi
   - cursor
   - claude-code
   - codex
-  - pi
 
 governance:
   requireGitSnapshotOnHandoff: true

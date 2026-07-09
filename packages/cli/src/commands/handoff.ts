@@ -36,10 +36,8 @@ export function parseHandoffTarget(to: string): HandoffTarget {
 
 export function formatRoutingReason(result: SelectHarnessResult): string {
   switch (result.reason) {
-    case "routing-rule":
-      return `routing-rule (pattern: ${result.matchedPattern})`;
-    case "strength-match":
-      return `strength-match (score: ${result.strengthScore})`;
+    case "ability-match":
+      return `ability-match (score: ${result.score ?? 0})`;
     case "failover":
       return "failover";
   }

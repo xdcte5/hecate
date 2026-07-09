@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { HarnessId } from "@relay/schema";
+import { buildAgentPrompt, buildLaunchArgs } from "./launch-args.js";
 
 export type LaunchRequest = {
   cwd: string;
@@ -27,27 +28,7 @@ async function writePromptFile(cwd: string, prompt: string): Promise<string> {
 }
 
 function buildPrompt(task: string, handoffPath: string): string {
-  return [
-    "Continue the active Relay product session.",
-    `Read ${handoffPath} before acting.`,
-    "",
-    `Task: ${task}`,
-  ].join("\n");
-}
-
-function buildLaunchArgs(harness: HarnessId, prompt: string): string[] {
-  switch (harness) {
-    case "claude-code":
-      return ["-p", prompt];
-    case "codex":
-      return ["exec", prompt];
-    case "cursor":
-      return ["-p", prompt];
-    case "pi":
-      return [prompt];
-    default:
-      return ["-p", prompt];
-  }
+  return buildAgentPrompt(task, handoffPath, false);
 }
 
 /** Spawn a harness CLI with the handoff prompt, or return manual instructions. */

@@ -1,4 +1,4 @@
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { HarnessId } from "@relay/schema";
@@ -12,24 +12,24 @@ const fixtureRoot = join(
 );
 
 describe("handoff --to auto (fixture integration)", () => {
-  it("routes fix React component to cursor via routing-rule", async () => {
+  it("routes fix React component to cursor via frontend+debug abilities", async () => {
     const { registry, sessionPolicy } = await loadRelayConfig(fixtureRoot);
     const router = new ThinRouter(registry, sessionPolicy);
-    const result = router.selectHarnessDetailed("fix React component");
+    const result = router.routeTask("fix React component");
 
     expect(result.harness).toBe("cursor");
-    expect(result.reason).toBe("routing-rule");
-    expect(result.matchedPattern).toContain("react");
+    expect(result.reason).toBe("ability-match");
+    expect(result.signals).toContain("frontend");
   });
 
-  it("routes write unit tests to codex via routing-rule", async () => {
+  it("routes write unit tests to codex via ability match", async () => {
     const { registry, sessionPolicy } = await loadRelayConfig(fixtureRoot);
     const router = new ThinRouter(registry, sessionPolicy);
-    const result = router.selectHarnessDetailed("write unit tests");
+    const result = router.routeTask("write unit tests");
 
     expect(result.harness).toBe("codex");
-    expect(result.reason).toBe("routing-rule");
-    expect(result.matchedPattern).toContain("unit test");
+    expect(result.reason).toBe("ability-match");
+    expect(result.signals).toContain("test");
   });
 
   it("routes refactor module layout to claude-code", async () => {
@@ -46,12 +46,12 @@ describe("handoff --to auto (fixture integration)", () => {
     expect(router.selectHarness("build cli tool")).toBe("pi");
   });
 
-  it("falls back to cursor for unmatched goals", async () => {
+  it("falls back to pi for unmatched goals", async () => {
     const { registry, sessionPolicy } = await loadRelayConfig(fixtureRoot);
     const router = new ThinRouter(registry, sessionPolicy);
-    const result = router.selectHarnessDetailed("do something vague");
+    const result = router.routeTask("do something vague");
 
-    expect(result.harness).toBe("cursor");
+    expect(result.harness).toBe("pi");
     expect(result.reason).toBe("failover");
   });
 

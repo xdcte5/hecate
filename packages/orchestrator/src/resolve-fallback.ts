@@ -6,14 +6,16 @@ export async function resolveHarnessWithFallback(
   registry: Registry,
   preferred: HarnessId,
   failover: HarnessId[],
-): Promise<{ harness: HarnessId; binary: string; fallback: boolean } | null> {
+): Promise<{ harness: HarnessId; binary: string; fallback: boolean; skipped: HarnessId[] } | null> {
   const order = [preferred, ...failover.filter((h) => h !== preferred)];
+  const skipped: HarnessId[] = [];
 
   for (const harness of order) {
     const binary = await resolveHarnessBinary(registry, harness);
     if (binary) {
-      return { harness, binary, fallback: harness !== preferred };
+      return { harness, binary, fallback: harness !== preferred, skipped };
     }
+    skipped.push(harness);
   }
 
   return null;

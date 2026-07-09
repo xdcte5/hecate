@@ -5,11 +5,25 @@ harnesses:
       - refactoring
       - complex reasoning
       - system design
+      - debugging
     weaknesses:
       - quick edits
       - unit tests
     binaries:
       - claude
+    models:
+      - id: claude-sonnet-4-6
+        strengths:
+          - frontend
+          - implementation
+          - reasoning
+          - debugging
+      - id: claude-opus-4-6
+        strengths:
+          - architecture
+          - refactoring
+          - complex reasoning
+          - system design
 
   - id: codex
     strengths:
@@ -17,11 +31,24 @@ harnesses:
       - test generation
       - api design
       - typescript
+      - debugging
     weaknesses:
       - ui work
       - frontend styling
     binaries:
       - codex
+    models:
+      - id: o4-mini
+        strengths:
+          - unit tests
+          - test generation
+          - quick tasks
+      - id: o3
+        strengths:
+          - api design
+          - typescript
+          - reasoning
+          - backend
 
   - id: cursor
     strengths:
@@ -31,20 +58,55 @@ harnesses:
       - ide integration
       - jsx
       - tsx
+      - ui
+      - portfolio
+      - graph
+      - visualization
     weaknesses:
       - long-running tasks
       - deep architecture
     binaries:
       - cursor-agent
+    models:
+      - id: composer-2
+        strengths:
+          - react
+          - frontend
+          - jsx
+          - tsx
+          - ui
+          - portfolio
+          - graph
+          - visualization
+      - id: gpt-5.3-codex
+        strengths:
+          - implementation
+          - debugging
+          - backend
 
   - id: pi
     strengths:
+      - implementation
+      - greenfield
+      - scaffolding
       - scripts
       - automation
       - cli
-      - lightweight tasks
+      - full-stack
     binaries:
       - pi
     weaknesses:
-      - complex codebases
-      - multi-file refactors
+      - complex refactors
+    models:
+      - id: claude-sonnet-4-6
+        strengths:
+          - implementation
+          - greenfield
+          - scaffolding
+          - full-stack
+      - id: gpt-4o
+        strengths:
+          - scripts
+          - automation
+          - cli
+          - shell

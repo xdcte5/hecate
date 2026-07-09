@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { HarnessId } from "@relay/schema";
+import { buildAgentPrompt, buildLaunchArgs } from "./launch-args.js";
 
 export type AutoRunRequest = {
   cwd: string;
@@ -9,6 +10,7 @@ export type AutoRunRequest = {
   binary: string;
   task: string;
   handoffPath: string;
+  model?: string;
   timeoutMs?: number;
   signal?: AbortSignal;
   onOutput?: (line: string) => void;
@@ -21,27 +23,7 @@ export type AutoRunResult = {
 };
 
 function buildPrompt(task: string, handoffPath: string): string {
-  return [
-    "Continue the active Relay product session.",
-    `Read ${handoffPath} before acting.`,
-    "",
-    `Task: ${task}`,
-  ].join("\n");
-}
-
-function buildLaunchArgs(harness: HarnessId, prompt: string): string[] {
-  switch (harness) {
-    case "claude-code":
-      return ["-p", prompt];
-    case "codex":
-      return ["exec", "--full-auto", prompt];
-    case "cursor":
-      return ["-p", prompt];
-    case "pi":
-      return [prompt];
-    default:
-      return ["-p", prompt];
-  }
+  return buildAgentPrompt(task, handoffPath);
 }
 
 function cleanAgentEnv(): NodeJS.ProcessEnv {
@@ -49,6 +31,10 @@ function cleanAgentEnv(): NodeJS.ProcessEnv {
     ...process.env,
     ZDOTDIR: "/dev/null",
     DOTENV_CONFIG_QUIET: "true",
+    ZSH_DISABLE_COMPFIX: "true",
+    CI: "true",
+    NO_COLOR: "1",
+    CLAUDE_CODE_ENTRYPOINT: "relay",
   };
 }
 
@@ -77,7 +63,7 @@ export async function runHarnessAuto(request: AutoRunRequest): Promise<AutoRunRe
   await mkdir(dir, { recursive: true });
   await writeFile(join(dir, "prompt.txt"), prompt, "utf8");
 
-  const args = buildLaunchArgs(request.harness, prompt);
+  const args = buildLaunchArgs(request.harness, prompt, request.model);
   const timeoutMs = request.timeoutMs ?? 10 * 60 * 1000;
 
   return new Promise((resolve) => {
@@ -112,6 +98,7 @@ export async function runHarnessAuto(request: AutoRunRequest): Promise<AutoRunRe
         RELAY_HANDOFF_PATH: request.handoffPath,
         RELAY_TASK: request.task,
         RELAY_HARNESS: request.harness,
+        ...(request.model ? { RELAY_MODEL: request.model } : {}),
       },
     });
 

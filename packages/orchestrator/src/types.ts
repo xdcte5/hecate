@@ -1,5 +1,5 @@
 import type { HarnessId } from "@relay/schema";
-import type { SelectHarnessReason } from "@relay/registry";
+import type { RouteModelReason, SelectHarnessReason } from "@relay/registry";
 
 export type RunStepStatus = "pending" | "running" | "done" | "failed" | "skipped" | "manual";
 
@@ -8,6 +8,9 @@ export type RunStep = {
   task: string;
   harness: HarnessId;
   reason: SelectHarnessReason;
+  model?: string;
+  modelReason?: RouteModelReason;
+  wave: number;
   status: RunStepStatus;
   binary?: string;
   startedAt?: string;
@@ -27,7 +30,9 @@ export type RunState = {
 
 export type RunPlan = {
   goal: string;
-  steps: Array<Pick<RunStep, "id" | "task" | "harness" | "reason">>;
+  steps: Array<
+    Pick<RunStep, "id" | "task" | "harness" | "reason" | "model" | "modelReason" | "wave">
+  >;
 };
 
 export type LaunchMode = "dry-run" | "launch" | "clipboard";

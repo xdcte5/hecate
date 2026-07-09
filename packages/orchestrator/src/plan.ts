@@ -1,51 +1,79 @@
 import type { HarnessId } from "@relay/schema";
 import { ThinRouter } from "@relay/registry";
 import type { RunPlan } from "./types.js";
+import { analyzeGoal, buildStepTask } from "./goal-analysis.js";
 
-function shouldAddTestStep(goal: string, primaryHarness: HarnessId): boolean {
-  if (/\b(test|tests|vitest|jest)\b/i.test(goal)) return false;
-  if (primaryHarness === "codex") return false;
-  return true;
+function routeStep(router: ThinRouter, id: string, task: string, wave: number): RunPlan["steps"][number] {
+  const route = router.routeTask(task);
+  const modelRoute = router.routeModel(task, route.harness);
+  return {
+    id,
+    task,
+    harness: route.harness,
+    reason: route.reason,
+    model: modelRoute.modelId,
+    modelReason: modelRoute.reason,
+    wave,
+  };
 }
 
-function shouldAddReviewStep(goal: string): boolean {
-  return /\b(refactor|architecture|system|migrate|redesign)\b/i.test(goal);
-}
-
-/** Break a user goal into routed agent steps. */
+/**
+ * Break a user goal into routed agent steps grouped by execution wave.
+ * Steps are derived from goal intent — no automatic unit-test step unless asked.
+ */
 export function buildRunPlan(goal: string, router: ThinRouter): RunPlan {
   const trimmed = goal.trim();
+  const analysis = analyzeGoal(trimmed);
   const steps: RunPlan["steps"] = [];
 
-  const primary = router.selectHarnessDetailed(trimmed);
-  steps.push({
-    id: "implement",
-    task: trimmed,
-    harness: primary.harness,
-    reason: primary.reason,
-  });
+  switch (analysis.mode) {
+    case "test":
+      steps.push(routeStep(router, "test", buildStepTask("test", trimmed), 0));
+      break;
 
-  if (shouldAddTestStep(trimmed, primary.harness)) {
-    const testTask = `write unit tests for: ${trimmed}`;
-    const testRoute = router.selectHarnessDetailed(testTask);
-    steps.push({
-      id: "test",
-      task: testTask,
-      harness: testRoute.harness,
-      reason: testRoute.reason,
-    });
-  }
+    case "review":
+    case "refactor":
+      steps.push(routeStep(router, "review", buildStepTask("review", trimmed), 0));
+      break;
 
-  if (shouldAddReviewStep(trimmed)) {
-    const reviewTask = `review architecture and risks for: ${trimmed}`;
-    const reviewRoute = router.selectHarnessDetailed(reviewTask);
-    steps.push({
-      id: "review",
-      task: reviewTask,
-      harness: reviewRoute.harness,
-      reason: reviewRoute.reason,
-    });
+    case "fix":
+      steps.push(routeStep(router, "fix", buildStepTask("fix", trimmed), 0));
+      break;
+
+    case "build":
+    default: {
+      const parallelImplement = analysis.layers.frontend && analysis.layers.backend;
+      if (parallelImplement) {
+        steps.push(
+          routeStep(router, "implement-frontend", buildStepTask("implement-frontend", trimmed), 0),
+        );
+        steps.push(
+          routeStep(router, "implement-backend", buildStepTask("implement-backend", trimmed), 0),
+        );
+      } else {
+        steps.push(routeStep(router, "implement", trimmed, 0));
+      }
+
+      const followUpWave = 1;
+      if (analysis.wantsTests) {
+        steps.push(routeStep(router, "test", buildStepTask("test", trimmed), followUpWave));
+      }
+      if (analysis.wantsReview) {
+        steps.push(routeStep(router, "review", buildStepTask("review", trimmed), followUpWave));
+      }
+      break;
+    }
   }
 
   return { goal: trimmed, steps };
+}
+
+export function groupStepsByWave<T extends { wave: number }>(steps: T[]): Map<number, T[]> {
+  const waves = new Map<number, T[]>();
+  for (const step of steps) {
+    const list = waves.get(step.wave) ?? [];
+    list.push(step);
+    waves.set(step.wave, list);
+  }
+  return new Map([...waves.entries()].sort((a, b) => a[0] - b[0]));
 }

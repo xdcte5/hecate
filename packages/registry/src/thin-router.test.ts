@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { HarnessId, Registry, SessionPolicy } from "@relay/schema";
 import { loadRelayConfig } from "./load-registry.js";
+import { TaskRouter, routeTask } from "./task-router.js";
 import { ThinRouter, selectHarness, selectHarnessDetailed } from "./thin-router.js";
 
 const fixtureRoot = join(
@@ -14,105 +15,116 @@ const registry: Registry = {
   harnesses: [
     {
       id: "claude-code",
-      strengths: ["architecture", "refactoring", "complex reasoning", "system design"],
+      strengths: ["architecture", "refactoring", "complex reasoning", "system design", "debugging"],
       weaknesses: ["quick edits", "unit tests"],
       binaries: ["claude"],
     },
     {
       id: "codex",
-      strengths: ["unit tests", "test generation", "api design", "typescript"],
+      strengths: ["unit tests", "test generation", "api design", "typescript", "debugging"],
       weaknesses: ["ui work", "frontend styling"],
       binaries: ["codex"],
     },
     {
       id: "cursor",
-      strengths: ["react", "frontend", "component fixes", "ide integration", "jsx", "tsx"],
+      strengths: [
+        "react",
+        "frontend",
+        "component fixes",
+        "ide integration",
+        "jsx",
+        "tsx",
+        "ui",
+        "portfolio",
+        "graph",
+      ],
       weaknesses: ["long-running tasks", "deep architecture"],
       binaries: ["cursor-agent"],
     },
     {
       id: "pi",
-      strengths: ["scripts", "automation", "cli", "lightweight tasks"],
-      weaknesses: ["complex codebases", "multi-file refactors"],
+      strengths: ["implementation", "greenfield", "scaffolding", "scripts", "automation", "cli", "full-stack"],
+      weaknesses: ["complex refactors"],
       binaries: ["pi"],
     },
   ],
 };
 
 const policy: SessionPolicy = {
-  routing: [
-    {
-      pattern: "(?i)(unit test|write tests|vitest|jest|mocha)",
-      harness: "codex",
-      description: "Test writing tasks go to Codex",
-    },
-    {
-      pattern: "(?i)(react|component|jsx|tsx|frontend)",
-      harness: "cursor",
-      description: "Frontend and React work goes to Cursor",
-    },
-    {
-      pattern: "(?i)(refactor|architecture|system design)",
-      harness: "claude-code",
-      description: "Architecture and refactoring goes to Claude Code",
-    },
-    {
-      pattern: "(?i)\\b(script|automation|cli|shell)\\b",
-      harness: "pi",
-      description: "Scripts and automation go to Pi",
-    },
-  ],
-  failover: ["cursor", "claude-code", "codex", "pi"],
+  routing: [],
+  failover: ["pi", "cursor", "claude-code", "codex"],
 };
 
 const router = new ThinRouter(registry, policy);
+const taskRouter = new TaskRouter(registry, policy);
 
-describe("ThinRouter routing rules", () => {
-  it("routes write unit tests to codex", () => {
-    expect(router.selectHarness("write unit tests for auth module")).toBe("codex");
+describe("TaskRouter ability matching", () => {
+  it("routes explicit tests to codex", () => {
+    expect(taskRouter.routeTask("write unit tests for auth module")).toMatchObject({
+      harness: "codex",
+      reason: "ability-match",
+    });
   });
 
-  it("routes fix React component to cursor", () => {
-    expect(router.selectHarness("fix React component rendering bug")).toBe("cursor");
+  it("routes portfolio UI to cursor", () => {
+    expect(
+      taskRouter.routeTask("build a portfolio page with graph ui showing socials"),
+    ).toMatchObject({
+      harness: "cursor",
+      reason: "ability-match",
+    });
+  });
+
+  it("routes frontend bug fixes to cursor", () => {
+    expect(taskRouter.routeTask("fix React component rendering bug")).toMatchObject({
+      harness: "cursor",
+      reason: "ability-match",
+    });
   });
 
   it("routes vitest tasks to codex", () => {
-    expect(router.selectHarness("add vitest coverage for parser")).toBe("codex");
+    expect(taskRouter.routeTask("add vitest coverage for parser")).toMatchObject({
+      harness: "codex",
+      reason: "ability-match",
+    });
   });
 
   it("routes jsx work to cursor", () => {
-    expect(router.selectHarness("update jsx markup in header")).toBe("cursor");
+    expect(taskRouter.routeTask("update jsx markup in header")).toMatchObject({
+      harness: "cursor",
+      reason: "ability-match",
+    });
   });
 
   it("routes refactor tasks to claude-code", () => {
-    expect(router.selectHarness("refactor payment service boundaries")).toBe("claude-code");
+    expect(taskRouter.routeTask("refactor payment service boundaries")).toMatchObject({
+      harness: "claude-code",
+      reason: "ability-match",
+    });
   });
 
   it("routes shell automation to pi", () => {
-    expect(router.selectHarness("create shell script for nightly backups")).toBe("pi");
+    expect(taskRouter.routeTask("create shell script for nightly backups")).toMatchObject({
+      harness: "pi",
+      reason: "ability-match",
+    });
   });
 
-  it("matches routing rules case-insensitively", () => {
-    expect(router.selectHarness("FIX REACT COMPONENT in dashboard")).toBe("cursor");
-    expect(router.selectHarness("WRITE UNIT TESTS for reducer")).toBe("codex");
+  it("routes generic debugging to a debugging-capable harness", () => {
+    const result = taskRouter.routeTask("fix authentication bug in middleware");
+    expect(["claude-code", "codex"]).toContain(result.harness);
+    expect(result.reason).toBe("ability-match");
   });
 
-  it("prefers the first matching routing rule when several apply", () => {
-    expect(router.selectHarness("write unit tests for React component")).toBe("codex");
-  });
-
-  it("returns routing-rule reason with matched pattern metadata", () => {
-    const result = selectHarnessDetailed("fix React component", registry, policy);
-
-    expect(result).toEqual({
-      harness: "cursor",
-      reason: "routing-rule",
-      matchedPattern: "(?i)(react|component|jsx|tsx|frontend)",
+  it("routes vague build goals to highest implement scorer", () => {
+    expect(taskRouter.routeTask("build something new from scratch")).toMatchObject({
+      harness: "pi",
+      reason: "ability-match",
     });
   });
 });
 
-describe("ThinRouter strength matching", () => {
+describe("ThinRouter ability matching", () => {
   it("falls back to typescript strength for codex", () => {
     expect(router.selectHarness("explain typescript generics in this module")).toBe("codex");
   });
@@ -121,71 +133,73 @@ describe("ThinRouter strength matching", () => {
     expect(router.selectHarness("improve ide integration for diagnostics")).toBe("cursor");
   });
 
-  it("falls back to lightweight tasks strength for pi", () => {
-    expect(router.selectHarness("handle this lightweight tasks queue")).toBe("pi");
-  });
-
-  it("uses failover order to break strength ties", () => {
+  it("uses failover order to break ability ties", () => {
+    const tiedRegistry: Registry = {
+      harnesses: [
+        {
+          id: "pi",
+          strengths: ["alpha"],
+          weaknesses: [],
+          binaries: ["pi"],
+        },
+        {
+          id: "cursor",
+          strengths: ["alpha"],
+          weaknesses: [],
+          binaries: ["cursor-agent"],
+        },
+      ],
+    };
     const tiedPolicy: SessionPolicy = {
       routing: [],
       failover: ["pi", "cursor", "codex", "claude-code"],
     };
 
-    expect(
-      selectHarness("work on frontend and scripts", registry, tiedPolicy),
-    ).toBe("pi");
+    expect(selectHarness("do alpha work", tiedRegistry, tiedPolicy)).toBe("pi");
   });
 
-  it("returns strength-match reason with score metadata", () => {
-    const result = selectHarnessDetailed(
-      "improve api design for billing",
-      registry,
-      policy,
-    );
+  it("returns ability-match reason with score metadata", () => {
+    const result = selectHarnessDetailed("improve api design for billing", registry, policy);
 
     expect(result.harness).toBe("codex");
-    expect(result.reason).toBe("strength-match");
-    expect(result.strengthScore).toBe(1);
+    expect(result.reason).toBe("ability-match");
+    expect(result.score).toBeGreaterThan(0);
+  });
+
+  it("exposes routeTask on ThinRouter", () => {
+    const result = router.routeTask("write unit tests");
+    expect(result.harness).toBe("codex");
+    expect(result.score).toBeGreaterThan(0);
   });
 });
 
 describe("ThinRouter failover", () => {
-  it("uses the first failover harness when no rules or strengths match", () => {
-    expect(router.selectHarness("do something vague")).toBe("cursor");
+  it("uses the first failover harness when no abilities match", () => {
+    expect(router.selectHarness("do something vague")).toBe("pi");
   });
 
   it("returns failover reason for unmatched tasks", () => {
     const result = selectHarnessDetailed("do something vague", registry, policy);
 
     expect(result).toEqual({
-      harness: "cursor",
+      harness: "pi",
       reason: "failover",
+      score: 0,
+      signals: [],
     });
   });
 
   it("respects a custom failover order", () => {
     const customPolicy: SessionPolicy = {
       routing: [],
-      failover: ["pi", "codex", "cursor", "claude-code"],
+      failover: ["cursor", "pi", "codex", "claude-code"],
     };
 
-    expect(selectHarness("do something vague", registry, customPolicy)).toBe("pi");
+    expect(selectHarness("do something vague", registry, customPolicy)).toBe("cursor");
   });
 });
 
-describe("ThinRouter resilience", () => {
-  it("skips invalid regex patterns and continues matching", () => {
-    const brokenPolicy: SessionPolicy = {
-      routing: [
-        { pattern: "[invalid", harness: "pi" },
-        { pattern: "(?i)react", harness: "cursor" },
-      ],
-      failover: policy.failover,
-    };
-
-    expect(selectHarness("fix react state", registry, brokenPolicy)).toBe("cursor");
-  });
-
+describe("ThinRouter fixture integration", () => {
   it("loads fixture config from relay directory under project cwd", async () => {
     const { registry: loadedRegistry, sessionPolicy } = await loadRelayConfig(fixtureRoot);
 
@@ -195,10 +209,11 @@ describe("ThinRouter resilience", () => {
       "cursor",
       "pi",
     ]);
-    expect(sessionPolicy.failover).toEqual(["cursor", "claude-code", "codex", "pi"]);
+    expect(sessionPolicy.routing).toEqual([]);
+    expect(sessionPolicy.failover).toEqual(["pi", "cursor", "claude-code", "codex"]);
   });
 
-  it("routes fixture-backed tasks the same as in-memory config", async () => {
+  it("routes fixture-backed tasks via ability scoring", async () => {
     const { registry: loadedRegistry, sessionPolicy } = await loadRelayConfig(fixtureRoot);
     const fixtureRouter = new ThinRouter(loadedRegistry, sessionPolicy);
 
@@ -212,5 +227,14 @@ describe("ThinRouter resilience", () => {
     for (const [task, harness] of cases) {
       expect(fixtureRouter.selectHarness(task)).toBe(harness);
     }
+  });
+});
+
+describe("routeTask", () => {
+  it("throws when failover is empty", () => {
+    const emptyPolicy: SessionPolicy = { routing: [], failover: [] as HarnessId[] };
+    expect(() => routeTask("anything", registry, emptyPolicy)).toThrow(
+      "failover order must not be empty",
+    );
   });
 });

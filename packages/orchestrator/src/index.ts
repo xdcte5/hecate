@@ -1,4 +1,6 @@
-export { buildRunPlan } from "./plan.js";
+export { buildRunPlan, groupStepsByWave } from "./plan.js";
+export { executePlan, type ExecutePlanOptions, type ExecutePlanResult } from "./execute-plan.js";
+export { verifyImplementWave, listChangedFiles } from "./verify.js";
 export { resolveHarnessBinary } from "./resolve-binary.js";
 export { resolveHarnessWithFallback, resolveHarnessWithFallbackFromConfig } from "./resolve-fallback.js";
 export { launchHarness, formatManualLaunch } from "./launcher.js";

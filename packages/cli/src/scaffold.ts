@@ -2,39 +2,79 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { stringify as stringifyYaml } from "yaml";
-import type { HarnessId } from "@relay/schema";
+import type { HarnessId, ModelCard } from "@relay/schema";
 
 export interface DefaultCard {
   id: HarnessId;
   strengths: string[];
   weaknesses: string[];
   binaries: string[];
+  models?: ModelCard[];
 }
+
+export const DEFAULT_MODELS: Record<HarnessId, ModelCard[]> = {
+  "claude-code": [
+    {
+      id: "claude-sonnet-4-6",
+      strengths: ["frontend", "implementation", "reasoning", "debugging"],
+      weaknesses: [],
+    },
+    {
+      id: "claude-opus-4-6",
+      strengths: ["architecture", "refactoring", "complex reasoning", "system design"],
+      weaknesses: [],
+    },
+  ],
+  codex: [
+    { id: "o4-mini", strengths: ["unit tests", "test generation", "quick tasks"], weaknesses: [] },
+    { id: "o3", strengths: ["api design", "typescript", "reasoning", "backend"], weaknesses: [] },
+  ],
+  cursor: [
+    {
+      id: "composer-2",
+      strengths: ["react", "frontend", "jsx", "tsx", "ui", "portfolio", "graph", "visualization"],
+      weaknesses: [],
+    },
+    { id: "gpt-5.3-codex", strengths: ["implementation", "debugging", "backend"], weaknesses: [] },
+  ],
+  pi: [
+    {
+      id: "claude-sonnet-4-6",
+      strengths: ["implementation", "greenfield", "scaffolding", "full-stack"],
+      weaknesses: [],
+    },
+    { id: "gpt-4o", strengths: ["scripts", "automation", "cli", "shell"], weaknesses: [] },
+  ],
+};
 
 export const DEFAULT_CARDS: DefaultCard[] = [
   {
     id: "claude-code",
-    strengths: ["architecture", "refactoring", "complex reasoning", "system design"],
+    strengths: ["architecture", "refactoring", "complex reasoning", "system design", "debugging"],
     weaknesses: ["quick edits", "unit tests"],
     binaries: ["claude"],
+    models: DEFAULT_MODELS["claude-code"],
   },
   {
     id: "codex",
-    strengths: ["unit tests", "test generation", "api design", "typescript"],
+    strengths: ["unit tests", "test generation", "api design", "typescript", "debugging"],
     weaknesses: ["ui work", "frontend styling"],
     binaries: ["codex"],
+    models: DEFAULT_MODELS.codex,
   },
   {
     id: "cursor",
-    strengths: ["react", "frontend", "component fixes", "jsx", "tsx"],
+    strengths: ["react", "frontend", "component fixes", "jsx", "tsx", "ui", "portfolio", "graph", "visualization"],
     weaknesses: ["long-running tasks", "deep architecture"],
     binaries: ["cursor-agent"],
+    models: DEFAULT_MODELS.cursor,
   },
   {
     id: "pi",
-    strengths: ["scripts", "automation", "cli", "lightweight tasks"],
-    weaknesses: ["complex codebases", "multi-file refactors"],
+    strengths: ["implementation", "greenfield", "scaffolding", "scripts", "automation", "cli", "full-stack"],
+    weaknesses: ["complex refactors"],
     binaries: ["pi"],
+    models: DEFAULT_MODELS.pi,
   },
 ];
 
@@ -46,13 +86,8 @@ rules, Pi overlay). Edit \`relay/\`, never the generated output.
 `;
 
 export const DEFAULT_POLICY = {
-  routing: [
-    { pattern: "(?i)(unit test|write tests|vitest|jest)", harness: "codex", description: "Tests go to Codex" },
-    { pattern: "(?i)(react|component|jsx|tsx|frontend)", harness: "cursor", description: "Frontend goes to Cursor" },
-    { pattern: "(?i)(refactor|architecture|system design)", harness: "claude-code", description: "Architecture goes to Claude Code" },
-    { pattern: "(?i)\\b(script|automation|cli|shell)\\b", harness: "pi", description: "Scripts go to Pi" },
-  ],
-  failover: ["cursor", "claude-code", "codex", "pi"],
+  routing: [],
+  failover: ["pi", "cursor", "claude-code", "codex"],
   governance: { requireGitSnapshotOnHandoff: true, maxHandoffTokens: 8000, maxTranscriptLines: 200 },
 };
 

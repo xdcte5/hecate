@@ -13,3 +13,17 @@ export {
   type SelectHarnessReason,
   type SelectHarnessResult,
 } from "./thin-router.js";
+
+export {
+  TaskRouter,
+  routeTask,
+  type RouteTaskReason,
+  type RouteTaskResult,
+} from "./task-router.js";
+
+export {
+  ModelRouter,
+  routeModel,
+  type RouteModelReason,
+  type RouteModelResult,
+} from "./model-router.js";
