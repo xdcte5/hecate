@@ -4,18 +4,19 @@ Personal dev agent mesh — one Product Session across Claude Code, Codex, Curso
 
 ## Status
 
-**Both tracks complete.** 6 packages, full session/handoff/routing/governance stack
-(Mesh Brain) plus 4 harness adapters, manifest-owned build, and MCP mesh fabric
-(Harness Fabric).
+**7 packages.** Full session/handoff/routing/governance stack (Mesh Brain), 4 harness
+adapters + manifest-owned build + MCP mesh fabric (Harness Fabric), and an
+auto-orchestrator that plans a goal and fans agents out in parallel (Super-Harness).
 
 | Package | Track | Purpose |
 |---------|-------|---------|
-| `@relay/schema` | Mesh Brain | RHP v1, HandoffBundle, registry, session-policy, relay config, adapter manifest |
-| `@relay/registry` | Mesh Brain | Harness Cards + ThinRouter (deterministic, no LLM) |
+| `@relay/schema` | Mesh Brain | RHP v1, HandoffBundle, registry + model cards, session-policy, adapter manifest |
+| `@relay/registry` | Mesh Brain | Harness Cards + ThinRouter / TaskRouter / ModelRouter (deterministic) |
 | `@relay/session` | Mesh Brain | SessionStore, handoff builder, git snapshot, transcript trim, KPIs |
 | `@relay/adapters` | Harness Fabric | Claude/Codex/Cursor/Pi adapters, `relay.lock` drift, mcp-transform |
 | `@relay/mcp` | Harness Fabric | `relay-mcp` stdio server + 5 session/registry tools |
-| `@relay/cli` | Both | `init`, `build`, `watch`, `doctor`, `migrate`, `mcp`, `session`, `handoff`, `trace`, `registry` |
+| `@relay/orchestrator` | Super-Harness | Goal analysis, wave planner, parallel executor, harness drivers (CLI + Pi RPC) |
+| `@relay/cli` | All | `init`/`build`/`watch`/`doctor`/`migrate`/`mcp` + `chat`/`run`/`dash` + `session`/`handoff`/`trace`/`registry` |
 
 ## CLI commands
 
@@ -90,17 +91,7 @@ Adapted from [ide-bridge](https://github.com/Xsidz/ide-bridge) (MIT) — see `pa
 | [docs/security.md](./docs/security.md) | Local-only trust model |
 | [docs/quickstart.md](./docs/quickstart.md) | First handoff in < 15 min |
 | [docs/adapter-matrix.md](./docs/adapter-matrix.md) | Source → harness output mapping |
-
-## Monorepo
-
-| Package | Owner | Status |
-|---------|-------|--------|
-| `@relay/schema` | Dev A | Done |
-| `@relay/registry` | Dev A | Done |
-| `@relay/session` | Dev A | Done |
-| `@relay/cli` | Both | Done |
-| `@relay/adapters` | Dev B | Done (4 adapters, manifest/drift, mcp-transform) |
-| `@relay/mcp` | Dev B | Done (relay-mcp stdio, 5 tools) |
+| [docs/pi-harness-plan.md](./docs/pi-harness-plan.md) | Super-harness runtime roadmap (Pi-inspired) |
 
 ## Pro features (stubs)
 
