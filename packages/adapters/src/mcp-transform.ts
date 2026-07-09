@@ -9,13 +9,22 @@ import type { McpConfig, McpServer } from "./source.js";
  * Sprint 3 (`mcp-transform` full).
  */
 
-/** Claude Code `.mcp.json` — same shape as canonical. Deterministic key order. */
-export function toClaudeJson(config: McpConfig): string {
+function sortedServers(config: McpConfig): Record<string, McpServer> {
   const servers: Record<string, McpServer> = {};
   for (const name of Object.keys(config.mcpServers).sort()) {
     servers[name] = config.mcpServers[name]!;
   }
-  return `${JSON.stringify({ mcpServers: servers }, null, 2)}\n`;
+  return servers;
+}
+
+/** Claude Code `.mcp.json` — same shape as canonical. Deterministic key order. */
+export function toClaudeJson(config: McpConfig): string {
+  return `${JSON.stringify({ mcpServers: sortedServers(config) }, null, 2)}\n`;
+}
+
+/** Cursor `.cursor/mcp.json` — same `mcpServers` shape as Claude. */
+export function toCursorJson(config: McpConfig): string {
+  return `${JSON.stringify({ mcpServers: sortedServers(config) }, null, 2)}\n`;
 }
 
 function tomlString(value: string): string {

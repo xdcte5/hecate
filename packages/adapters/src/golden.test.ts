@@ -3,9 +3,11 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { HarnessId } from "@relay/schema";
-import { emptyBuildContext, type GeneratedFile } from "./adapter.js";
+import { emptyBuildContext, type Adapter, type GeneratedFile } from "./adapter.js";
 import { ClaudeAdapter } from "./claude.js";
 import { CodexAdapter } from "./codex.js";
+import { CursorAdapter } from "./cursor.js";
+import { PiAdapter } from "./pi.js";
 import { readRelaySource } from "./source.js";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
@@ -13,9 +15,11 @@ const fixtureRoot = join(here, "../../../fixtures/minimal-relay");
 const goldenRoot = join(here, "../../../fixtures/golden");
 const UPDATE = process.env.UPDATE_GOLDEN === "1";
 
-const adapters: Record<string, ClaudeAdapter | CodexAdapter> = {
+const adapters: Record<string, Adapter> = {
   claude: new ClaudeAdapter(),
   codex: new CodexAdapter(),
+  cursor: new CursorAdapter(),
+  pi: new PiAdapter(),
 };
 
 function walkGolden(dir: string): string[] {
@@ -70,7 +74,31 @@ describe("golden adapter output", () => {
 
 describe("adapter harness ids", () => {
   it("declare their harness", () => {
-    const ids: HarnessId[] = [adapters.claude!.harness, adapters.codex!.harness];
-    expect(ids).toEqual(["claude-code", "codex"]);
+    const ids: HarnessId[] = Object.values(adapters).map((a) => a.harness);
+    expect(ids).toEqual(["claude-code", "codex", "cursor", "pi"]);
+  });
+});
+
+describe("session inject", () => {
+  const pointer = ".relay/sessions/abc/HANDOFF.md";
+
+  it("weaves the handoff pointer into every adapter's instructions", async () => {
+    const source = await readRelaySource(fixtureRoot);
+    for (const adapter of Object.values(adapters)) {
+      const files = adapter.generate(source, { handoffPointer: pointer });
+      const instructionFile = files.find((f) =>
+        /CLAUDE\.md|AGENTS\.md|main\.mdc/.test(f.path),
+      );
+      expect(instructionFile, `${adapter.harness} has an instruction file`).toBeDefined();
+      expect(instructionFile!.content).toContain(pointer);
+    }
+  });
+
+  it("keeps Codex and Pi AGENTS.md byte-identical under shared instructions", async () => {
+    const source = await readRelaySource(fixtureRoot);
+    const ctx = { handoffPointer: pointer };
+    const codexAgents = adapters.codex!.generate(source, ctx).find((f) => f.path === "AGENTS.md");
+    const piAgents = adapters.pi!.generate(source, ctx).find((f) => f.path === "AGENTS.md");
+    expect(codexAgents!.content).toBe(piAgents!.content);
   });
 });

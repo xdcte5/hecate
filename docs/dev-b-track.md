@@ -34,11 +34,11 @@ Legend: ☐ pending · ◐ in progress · ☑ done
 
 ### Sprint 2 — Cursor/Pi + session inject + watch
 
-- ☐ Cursor adapter (`.cursor/rules/main.mdc`, mcp, skills) → golden test
-- ☐ Pi adapter (project scope + `--pi-global` flag) → golden test
-- ☐ Session inject hook in all 4 adapters (HANDOFF.md pointer in generated outputs)
-- ☐ `packages/adapters/mcp-transform.ts` stub (Claude JSON shape defined)
-- ☐ CLI: `relay watch` (rebuilds on `relay/` changes)
+- ☑ Cursor adapter (`.cursor/rules/main.mdc`, mcp, skills) → golden test
+- ☑ Pi adapter (project scope + `--pi-global` flag) → golden test
+- ☑ Session inject hook in all 4 adapters (HANDOFF.md pointer in generated outputs)
+- ☑ `packages/adapters/mcp-transform.ts` stub (Claude JSON shape defined)
+- ☑ CLI: `relay watch` (rebuilds on `relay/` changes)
 
 **Exit:** `relay build --all` injects the active session HANDOFF pointer into all 4 harnesses.
 

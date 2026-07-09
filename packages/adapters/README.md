@@ -46,12 +46,15 @@ recomputes the checksums against disk and reports `missing` or `modified` files,
 
 ## Adapter matrix
 
-| Harness     | Instructions | Subagents / Skills            | MCP                  |
-| ----------- | ------------ | ----------------------------- | -------------------- |
-| Claude Code | `CLAUDE.md`  | `.claude/agents`, `.claude/skills`, `.claude/commands` | `.mcp.json` |
-| Codex       | `AGENTS.md`  | `.codex/skills`               | `.codex/config.toml` |
-| Cursor      | _Sprint 2_   | _Sprint 2_                    | _Sprint 2_           |
-| Pi          | _Sprint 2_   | _Sprint 2_                    | _Sprint 2_           |
+| Harness     | Instructions            | Subagents / Skills / Commands                          | MCP                  |
+| ----------- | ----------------------- | ------------------------------------------------------ | -------------------- |
+| Claude Code | `CLAUDE.md`             | `.claude/agents`, `.claude/skills`, `.claude/commands` | `.mcp.json`          |
+| Codex       | `AGENTS.md`             | `.codex/skills`                                        | `.codex/config.toml` |
+| Cursor      | `.cursor/rules/main.mdc`| `.cursor/agents`, `.cursor/skills`                     | `.cursor/mcp.json`   |
+| Pi          | `AGENTS.md`             | `agents`, `skills`, `prompts`                          | `mcp.json`           |
+
+Codex and Pi share the project `AGENTS.md`. `relay build --pi-global` writes Pi's files
+to `~/.pi` instead (opt-in; untracked in `relay.lock`).
 
 ## Golden tests
 

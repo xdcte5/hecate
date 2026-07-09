@@ -22,13 +22,9 @@ export class CodexAdapter extends BaseAdapter {
   generate(source: RelaySource, ctx: BuildContext): GeneratedFile[] {
     const files: GeneratedFile[] = [];
 
-    const injectFooter = ctx.handoffPointer
-      ? `## Active session\n\nRead \`${ctx.handoffPointer}\` first for current context.`
-      : null;
-
     files.push({
       path: "AGENTS.md",
-      content: this.joinSections(this.instructionsFor(source), injectFooter),
+      content: this.joinSections(this.instructionsFor(source), this.agentsSessionFooter(ctx)),
     });
 
     for (const agent of source.agents) {

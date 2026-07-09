@@ -7,6 +7,7 @@ import { registerTraceCommands } from "./commands/trace.js";
 import { registerDoctorCommands } from "./commands/doctor.js";
 import { registerInitCommands } from "./commands/init.js";
 import { registerBuildCommands } from "./commands/build.js";
+import { registerWatchCommands } from "./commands/watch.js";
 
 const program = new Command();
 const getCwd = () => process.cwd();
@@ -18,6 +19,7 @@ program
 
 registerInitCommands(program, getCwd);
 registerBuildCommands(program, getCwd);
+registerWatchCommands(program, getCwd);
 registerRegistryCommands(program, getCwd);
 registerSessionCommands(program, getCwd);
 registerHandoffCommands(program, getCwd);

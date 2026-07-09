@@ -7,6 +7,8 @@ import {
 } from "./adapter.js";
 import { ClaudeAdapter } from "./claude.js";
 import { CodexAdapter } from "./codex.js";
+import { CursorAdapter } from "./cursor.js";
+import { PiAdapter } from "./pi.js";
 import {
   buildAdapterManifest,
   buildRelayLock,
@@ -15,12 +17,12 @@ import {
 } from "./manifest.js";
 import { readRelaySource, type RelaySource } from "./source.js";
 
-/** All adapters, keyed by harness. Cursor and Pi land in Sprint 2. */
+/** All four harness adapters, keyed by harness. */
 const ADAPTERS: Record<HarnessId, Adapter | undefined> = {
   "claude-code": new ClaudeAdapter(),
   codex: new CodexAdapter(),
-  cursor: undefined,
-  pi: undefined,
+  cursor: new CursorAdapter(),
+  pi: new PiAdapter(),
 };
 
 export function getAdapter(harness: HarnessId): Adapter {
@@ -40,6 +42,34 @@ export interface BuildOptions {
   relayVersion?: string;
   /** Pre-read source (used by `relay watch` to avoid re-reading). */
   source?: RelaySource;
+  /**
+   * Opt-in global scope for Pi (`relay build --pi-global`). When set, Pi's
+   * files are written under this directory (e.g. `~/.pi`) instead of the
+   * project root, and are not recorded in the repo-scoped `relay.lock`.
+   */
+  piGlobalHome?: string;
+}
+
+/**
+ * Guard against two adapters emitting different content for the same path
+ * (e.g. Codex vs Pi diverging on `AGENTS.md` because of per-harness
+ * instruction overrides). Identical content is fine — it's the shared-standard
+ * case. Divergence is a real conflict the user must resolve.
+ */
+function assertNoConflicts(filesByHarness: Record<string, GeneratedFile[]>): void {
+  const seen = new Map<string, { harness: string; content: string }>();
+  for (const [harness, files] of Object.entries(filesByHarness)) {
+    for (const file of files) {
+      const prior = seen.get(file.path);
+      if (prior && prior.content !== file.content) {
+        throw new Error(
+          `Conflicting output for ${file.path}: ${prior.harness} and ${harness} disagree. ` +
+            `These harnesses share this path — align their instructions or disable one.`,
+        );
+      }
+      if (!prior) seen.set(file.path, { harness, content: file.content });
+    }
+  }
 }
 
 export interface BuildResult {
@@ -64,16 +94,28 @@ export async function buildProject(
     (h) => ADAPTERS[h] !== undefined,
   );
 
+  // Generate all adapters first (pure), then check conflicts before any write.
   const filesByHarness: Record<string, GeneratedFile[]> = {};
+  for (const harness of targets) {
+    filesByHarness[harness] = getAdapter(harness).generate(source, ctx);
+  }
+  assertNoConflicts(filesByHarness);
+
   const manifests = [];
   let totalFiles = 0;
 
   for (const harness of targets) {
-    const files = getAdapter(harness).generate(source, ctx);
-    filesByHarness[harness] = files;
-    manifests.push(buildAdapterManifest(harness, files));
-    await writeGeneratedFiles(root, files);
+    const files = filesByHarness[harness]!;
     totalFiles += files.length;
+
+    // Pi in global scope writes outside the repo and is not tracked in relay.lock.
+    if (harness === "pi" && options.piGlobalHome) {
+      await writeGeneratedFiles(options.piGlobalHome, files);
+      continue;
+    }
+
+    await writeGeneratedFiles(root, files);
+    manifests.push(buildAdapterManifest(harness, files));
   }
 
   const lock = buildRelayLock(relayVersion, manifests);

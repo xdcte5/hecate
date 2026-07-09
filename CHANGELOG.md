@@ -26,6 +26,19 @@ Harness Fabric track lives in [docs/dev-b-track.md](./docs/dev-b-track.md).
   (regenerate with `UPDATE_GOLDEN=1`).
 - `packages/adapters/README.md` documents the adapter model and matrix.
 
+**Sprint 2 — Cursor/Pi + session inject + watch**
+
+- `@relay/adapters`: `CursorAdapter` (`.cursor/rules/main.mdc` + mcp/skills/agents),
+  `PiAdapter` (project `AGENTS.md` + agents/skills/prompts/mcp), `toCursorJson`.
+- Session inject: `BaseAdapter.agentsSessionFooter` + per-adapter inject weave the active
+  session's HANDOFF pointer into every harness's instruction file. Codex and Pi emit a
+  byte-identical `AGENTS.md`; `buildProject` fails loudly on any cross-adapter path conflict.
+- `@relay/cli`: `relay build` now injects the active session and accepts `--pi-global`
+  (writes Pi to `~/.pi`, untracked in `relay.lock`); new `relay watch` rebuilds on
+  `relay/` changes (debounced).
+- Golden fixtures extended to all 4 harnesses; new `build.test.ts` covers inject,
+  conflict detection, and pi-global.
+
 ### Added — Mesh Brain (Dev A)
 
 - `@relay/schema`: RHP v1, HandoffBundle, registry, session-policy, relay config Zod types.

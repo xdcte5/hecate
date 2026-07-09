@@ -44,6 +44,16 @@ export abstract class BaseAdapter implements Adapter {
     return source.instructionsByHarness[this.harness] ?? source.instructions ?? "";
   }
 
+  /**
+   * Shared session-inject footer for `AGENTS.md`-based harnesses (Codex, Pi).
+   * Keeping it identical means both adapters emit a byte-identical `AGENTS.md`
+   * from shared instructions, so a `build --all` never conflicts on that path.
+   */
+  protected agentsSessionFooter(ctx: BuildContext): string | null {
+    if (!ctx.handoffPointer) return null;
+    return `## Active session\n\nRead \`${ctx.handoffPointer}\` first for current context.`;
+  }
+
   /** Join sections with a single blank line, trimming trailing whitespace. */
   protected joinSections(...sections: Array<string | null | undefined>): string {
     const body = sections
