@@ -5,6 +5,7 @@ import {
   formatRoutingReason,
   parseHandoffTarget,
   resolveAutoHandoffTarget,
+  rotateAwayFromCurrent,
 } from "./handoff.js";
 
 const fixtureRoot = join(
@@ -41,5 +42,30 @@ describe("resolveAutoHandoffTarget", () => {
   it("routes write unit tests to codex", async () => {
     const { harness } = await resolveAutoHandoffTarget(fixtureRoot, "write unit tests");
     expect(harness).toBe("codex");
+  });
+
+  it("rotates away from the active harness on auto handoff", async () => {
+    const { harness, rotated } = await resolveAutoHandoffTarget(
+      fixtureRoot,
+      "add user login page",
+      "cursor",
+    );
+
+    expect(harness).toBe("claude-code");
+    expect(rotated).toBe(true);
+  });
+});
+
+describe("rotateAwayFromCurrent", () => {
+  it("returns the next failover harness when already on the selected one", () => {
+    expect(
+      rotateAwayFromCurrent("cursor", "cursor", ["cursor", "claude-code", "codex", "pi"]),
+    ).toBe("claude-code");
+  });
+
+  it("keeps explicit routing when it differs from current", () => {
+    expect(
+      rotateAwayFromCurrent("codex", "cursor", ["cursor", "claude-code", "codex", "pi"]),
+    ).toBe("codex");
   });
 });

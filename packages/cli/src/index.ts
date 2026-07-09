@@ -5,6 +5,10 @@ import { registerSessionCommands } from "./commands/session.js";
 import { registerHandoffCommands } from "./commands/handoff.js";
 import { registerTraceCommands } from "./commands/trace.js";
 import { registerDoctorCommands } from "./commands/doctor.js";
+import { registerDashCommands } from "./commands/dash.js";
+import { registerChatCommands } from "./commands/chat.js";
+import { registerRunCommands } from "./commands/run.js";
+import { runChat } from "./tui/chat.js";
 import { registerInitCommands } from "./commands/init.js";
 import { registerBuildCommands } from "./commands/build.js";
 import { registerWatchCommands } from "./commands/watch.js";
@@ -29,8 +33,19 @@ registerSessionCommands(program, getCwd);
 registerHandoffCommands(program, getCwd);
 registerTraceCommands(program, getCwd);
 registerDoctorCommands(program, getCwd);
+registerDashCommands(program, getCwd);
+registerChatCommands(program, getCwd);
+registerRunCommands(program, getCwd);
 
-program.parseAsync(process.argv).catch((err: unknown) => {
-  console.error(err instanceof Error ? err.message : err);
-  process.exit(1);
-});
+const userArgs = process.argv.slice(2);
+if (userArgs.length === 0 && process.stdin.isTTY) {
+  runChat({ cwd: getCwd() }).catch((err: unknown) => {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  });
+} else {
+  program.parseAsync(process.argv).catch((err: unknown) => {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  });
+}

@@ -45,18 +45,46 @@ export function formatRoutingReason(result: SelectHarnessResult): string {
   }
 }
 
+/** When auto picks the active harness, advance to the next failover target. */
+export function rotateAwayFromCurrent(
+  selected: HarnessId,
+  current: HarnessId | undefined,
+  failover: HarnessId[],
+): HarnessId {
+  if (!current || selected !== current) return selected;
+
+  const start = failover.indexOf(current);
+  if (start === -1) {
+    return failover.find((h) => h !== current) ?? selected;
+  }
+
+  for (let i = 1; i < failover.length; i++) {
+    const candidate = failover[(start + i) % failover.length]!;
+    if (candidate !== current) return candidate;
+  }
+
+  return selected;
+}
+
 export async function resolveAutoHandoffTarget(
   cwd: string,
   goal: string,
-): Promise<{ harness: HarnessId; routing: SelectHarnessResult; policy: SessionPolicy }> {
+  currentHarness?: HarnessId,
+): Promise<{ harness: HarnessId; routing: SelectHarnessResult; policy: SessionPolicy; rotated: boolean }> {
   const { registry, sessionPolicy } = await loadRelayConfig(cwd);
   const router = new ThinRouter(registry, sessionPolicy);
   const routing = router.selectHarnessDetailed(goal);
+  const harness = rotateAwayFromCurrent(
+    routing.harness,
+    currentHarness,
+    sessionPolicy.failover,
+  );
 
   return {
-    harness: routing.harness,
+    harness,
     routing,
     policy: sessionPolicy,
+    rotated: harness !== routing.harness,
   };
 }
 
@@ -119,11 +147,16 @@ export function registerHandoffCommands(program: Command, getCwd: () => string):
       let sessionPolicy: SessionPolicy | undefined;
 
       if (target === "auto") {
-        const resolved = await resolveAutoHandoffTarget(cwd, active.goal);
+        const resolved = await resolveAutoHandoffTarget(cwd, active.goal, active.activeHarness);
         targetHarness = resolved.harness;
         sessionPolicy = resolved.policy;
         console.log(`Auto-routed to: ${targetHarness}`);
         console.log(`Reason: ${formatRoutingReason(resolved.routing)}`);
+        if (resolved.rotated) {
+          console.log(
+            `Note: router picked ${resolved.routing.harness} but you are already there — rotated to ${targetHarness}`,
+          );
+        }
       } else {
         targetHarness = target;
       }

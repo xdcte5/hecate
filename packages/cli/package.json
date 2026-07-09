@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@relay/adapters": "workspace:*",
+    "@relay/orchestrator": "workspace:*",
     "@relay/registry": "workspace:*",
     "@relay/schema": "workspace:*",
     "@relay/session": "workspace:*",

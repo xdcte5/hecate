@@ -32,6 +32,9 @@ importers:
       '@relay/adapters':
         specifier: workspace:*
         version: link:../adapters
+      '@relay/orchestrator':
+        specifier: workspace:*
+        version: link:../orchestrator
       '@relay/registry':
         specifier: workspace:*
         version: link:../registry
@@ -75,6 +78,31 @@ importers:
       zod:
         specifier: ^4.3.6
         version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^25.6.0
+        version: 25.9.5
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.4
+        version: 4.1.10(@types/node@25.9.5)(vite@8.1.3(@types/node@25.9.5)(yaml@2.9.0))
+
+  packages/orchestrator:
+    dependencies:
+      '@relay/adapters':
+        specifier: workspace:*
+        version: link:../adapters
+      '@relay/registry':
+        specifier: workspace:*
+        version: link:../registry
+      '@relay/schema':
+        specifier: workspace:*
+        version: link:../schema
+      '@relay/session':
+        specifier: workspace:*
+        version: link:../session
     devDependencies:
       '@types/node':
         specifier: ^25.6.0

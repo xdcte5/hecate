@@ -26,6 +26,7 @@ relay registry list|show <harness>
 relay session start <goal>
 relay session status
 relay handoff --to <harness|auto> [--lossless]
+relay run <goal> [--launch] [--clipboard] [--next] [--status]
 relay trace [session-id]
 relay doctor --session [id] | --kpi
 ```
@@ -41,7 +42,19 @@ relay migrate --from agents-md|claude|codex
 relay mcp install|list             # MCP mesh fabric
 ```
 
-## Quick start
+## Default: chat mode
+
+```bash
+relay
+```
+
+Type natural language — Relay plans steps and runs agents automatically (Claude, Codex, Cursor, Pi).
+
+```bash
+relay chat                     # same as bare `relay`
+relay dash                     # power-user dashboard (optional)
+relay run <goal> [--launch]    # low-level orchestration (optional)
+```
 
 ```bash
 pnpm install
