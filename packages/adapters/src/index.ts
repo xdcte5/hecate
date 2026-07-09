@@ -18,6 +18,7 @@ export { ClaudeAdapter } from "./claude.js";
 export { CodexAdapter } from "./codex.js";
 export { CursorAdapter } from "./cursor.js";
 export { PiAdapter } from "./pi.js";
+export { GeminiAdapter } from "./gemini.js";
 
 export {
   toClaudeJson,

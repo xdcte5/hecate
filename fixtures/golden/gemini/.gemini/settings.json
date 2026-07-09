@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "relay": {
+      "command": "relay-mcp",
+      "args": [],
+      "env": {}
+    }
+  }
+}

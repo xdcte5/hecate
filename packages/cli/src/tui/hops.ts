@@ -15,6 +15,7 @@ const HARNESS_LABEL: Record<HarnessId, string> = {
   codex: "Codex",
   cursor: "Cursor",
   pi: "Pi",
+  "gemini-cli": "Gemini",
 };
 
 export function harnessLabel(id: HarnessId | string | undefined): string {

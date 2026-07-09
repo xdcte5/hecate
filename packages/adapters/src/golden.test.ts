@@ -8,6 +8,7 @@ import { ClaudeAdapter } from "./claude.js";
 import { CodexAdapter } from "./codex.js";
 import { CursorAdapter } from "./cursor.js";
 import { PiAdapter } from "./pi.js";
+import { GeminiAdapter } from "./gemini.js";
 import { readRelaySource } from "./source.js";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
@@ -20,6 +21,7 @@ const adapters: Record<string, Adapter> = {
   codex: new CodexAdapter(),
   cursor: new CursorAdapter(),
   pi: new PiAdapter(),
+  gemini: new GeminiAdapter(),
 };
 
 function walkGolden(dir: string): string[] {
@@ -75,7 +77,7 @@ describe("golden adapter output", () => {
 describe("adapter harness ids", () => {
   it("declare their harness", () => {
     const ids: HarnessId[] = Object.values(adapters).map((a) => a.harness);
-    expect(ids).toEqual(["claude-code", "codex", "cursor", "pi"]);
+    expect(ids).toEqual(["claude-code", "codex", "cursor", "pi", "gemini-cli"]);
   });
 });
 
@@ -87,7 +89,7 @@ describe("session inject", () => {
     for (const adapter of Object.values(adapters)) {
       const files = adapter.generate(source, { handoffPointer: pointer });
       const instructionFile = files.find((f) =>
-        /CLAUDE\.md|AGENTS\.md|main\.mdc/.test(f.path),
+        /CLAUDE\.md|AGENTS\.md|main\.mdc|GEMINI\.md/.test(f.path),
       );
       expect(instructionFile, `${adapter.harness} has an instruction file`).toBeDefined();
       expect(instructionFile!.content).toContain(pointer);

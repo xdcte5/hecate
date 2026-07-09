@@ -45,6 +45,18 @@ export const DEFAULT_MODELS: Record<HarnessId, ModelCard[]> = {
     },
     { id: "gpt-4o", strengths: ["scripts", "automation", "cli", "shell"], weaknesses: [] },
   ],
+  "gemini-cli": [
+    {
+      id: "gemini-2.5-pro",
+      strengths: ["long-context", "research", "multimodal", "reasoning", "large codebases"],
+      weaknesses: [],
+    },
+    {
+      id: "gemini-2.5-flash",
+      strengths: ["quick tasks", "summarization", "scripts"],
+      weaknesses: [],
+    },
+  ],
 };
 
 export const DEFAULT_CARDS: DefaultCard[] = [
@@ -75,6 +87,13 @@ export const DEFAULT_CARDS: DefaultCard[] = [
     weaknesses: ["complex refactors"],
     binaries: ["pi"],
     models: DEFAULT_MODELS.pi,
+  },
+  {
+    id: "gemini-cli",
+    strengths: ["long-context", "research", "multimodal", "large codebases", "documentation"],
+    weaknesses: ["agentic editing"],
+    binaries: ["gemini"],
+    models: DEFAULT_MODELS["gemini-cli"],
   },
 ];
 

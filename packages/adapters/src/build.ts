@@ -9,6 +9,7 @@ import { ClaudeAdapter } from "./claude.js";
 import { CodexAdapter } from "./codex.js";
 import { CursorAdapter } from "./cursor.js";
 import { PiAdapter } from "./pi.js";
+import { GeminiAdapter } from "./gemini.js";
 import {
   buildAdapterManifest,
   buildRelayLock,
@@ -17,12 +18,13 @@ import {
 } from "./manifest.js";
 import { readRelaySource, type RelaySource } from "./source.js";
 
-/** All four harness adapters, keyed by harness. */
+/** All harness adapters, keyed by harness. */
 const ADAPTERS: Record<HarnessId, Adapter | undefined> = {
   "claude-code": new ClaudeAdapter(),
   codex: new CodexAdapter(),
   cursor: new CursorAdapter(),
   pi: new PiAdapter(),
+  "gemini-cli": new GeminiAdapter(),
 };
 
 export function getAdapter(harness: HarnessId): Adapter {

@@ -208,6 +208,7 @@ describe("ThinRouter fixture integration", () => {
       "codex",
       "cursor",
       "pi",
+      "gemini-cli",
     ]);
     expect(sessionPolicy.routing).toEqual([]);
     expect(sessionPolicy.failover).toEqual(["pi", "cursor", "claude-code", "codex"]);

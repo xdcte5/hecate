@@ -40,6 +40,12 @@ export function buildLaunchArgs(harness: HarnessId, prompt: string, model?: stri
     case "pi":
       // Pi uses PiRpcDriver; model is passed via spawn args there.
       return model ? [prompt, "--model", model] : [prompt];
+    case "gemini-cli": {
+      // gemini -p "<prompt>" [-m model] --yolo (auto-approve tool calls)
+      const args = ["-p", prompt, "--yolo"];
+      if (model) args.push("-m", model);
+      return args;
+    }
     default: {
       const args = ["-p"];
       if (model) args.push("--model", model);

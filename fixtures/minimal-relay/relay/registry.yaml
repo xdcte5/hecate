@@ -110,3 +110,28 @@ harnesses:
           - automation
           - cli
           - shell
+
+  - id: gemini-cli
+    strengths:
+      - long-context
+      - research
+      - multimodal
+      - large codebases
+      - documentation
+    binaries:
+      - gemini
+    weaknesses:
+      - agentic editing
+    models:
+      - id: gemini-2.5-pro
+        strengths:
+          - long-context
+          - research
+          - multimodal
+          - reasoning
+          - large codebases
+      - id: gemini-2.5-flash
+        strengths:
+          - quick tasks
+          - summarization
+          - scripts
