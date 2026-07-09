@@ -11,6 +11,7 @@ import {
   handoffMdPath,
   handoffPath,
   sessionPath,
+  sessionsRoot,
 } from "./paths.js";
 import { buildHandoffArtifacts } from "./rhp-builder.js";
 import { setActiveSessionId } from "./relay-config.js";
@@ -109,6 +110,36 @@ export class SessionStore {
     });
 
     return updated;
+  }
+
+  /** All product sessions (excluding the active pointer), newest first. */
+  async list(): Promise<RhpV1[]> {
+    let entries: string[];
+    try {
+      entries = await fs.readdir(sessionsRoot(this.rootDir));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+      throw error;
+    }
+
+    const sessions = await Promise.all(
+      entries.map((entry) => (entry === "active" ? null : this.get(entry).catch(() => null))),
+    );
+    return sessions
+      .filter((session): session is RhpV1 => session !== null)
+      .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  }
+
+  /** Make an existing session the active one. */
+  async resume(id: string): Promise<RhpV1> {
+    const session = await this.requireSession(id);
+    await atomicWriteFile(activeSessionPath(this.rootDir), id);
+    await setActiveSessionId(this.rootDir, id);
+    await appendEvent(this.rootDir, id, {
+      event: "session_resumed",
+      harness: session.activeHarness,
+    });
+    return session;
   }
 
   /** All child sub-sessions spawned from `parentId`, in creation order. */

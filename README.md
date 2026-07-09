@@ -1,38 +1,51 @@
-# Relay (hecate)
+# Hecate
 
-Personal dev agent mesh — one Product Session across Claude Code, Codex, Cursor, and Pi.
+Personal **super-harness** — log in once across your agent subscriptions
+(Claude Code, Codex, Cursor, Pi, Gemini CLI), then hand one Product Session to whichever
+agent fits, or let Hecate fan a goal out across several in parallel. Local, inspectable.
+
+The CLI is `hecate` (with `relay` as an alias). Bare `hecate` opens a chat REPL that plans
+a goal and runs agents automatically.
 
 ## Status
 
-**7 packages.** Full session/handoff/routing/governance stack (Mesh Brain), 4 harness
-adapters + manifest-owned build + MCP mesh fabric (Harness Fabric), and an
-auto-orchestrator that plans a goal and fans agents out in parallel (Super-Harness).
+**7 packages, 5 harnesses.** Session/handoff/routing/governance (Mesh Brain), 5 harness
+adapters + manifest-owned build + MCP mesh fabric (Harness Fabric), and an auto-orchestrator
+that plans a goal and fans agents out in parallel into isolated sub-sessions (Super-Harness).
 
 | Package | Track | Purpose |
 |---------|-------|---------|
-| `@relay/schema` | Mesh Brain | RHP v1, HandoffBundle, registry + model cards, session-policy, adapter manifest |
+| `@relay/schema` | Mesh Brain | RHP v1 (+ parent/child), HandoffBundle, registry + model cards, adapter manifest |
 | `@relay/registry` | Mesh Brain | Harness Cards + ThinRouter / TaskRouter / ModelRouter (deterministic) |
-| `@relay/session` | Mesh Brain | SessionStore, handoff builder, git snapshot, transcript trim, KPIs |
-| `@relay/adapters` | Harness Fabric | Claude/Codex/Cursor/Pi adapters, `relay.lock` drift, mcp-transform |
+| `@relay/session` | Mesh Brain | SessionStore (+ child sub-sessions), handoff builder, git snapshot, KPIs |
+| `@relay/adapters` | Harness Fabric | Claude/Codex/Cursor/Pi/Gemini adapters, `relay.lock` drift, mcp-transform |
 | `@relay/mcp` | Harness Fabric | `relay-mcp` stdio server + 5 session/registry tools |
-| `@relay/orchestrator` | Super-Harness | Goal analysis, wave planner, parallel executor, harness drivers (CLI + Pi RPC) |
-| `@relay/cli` | All | `init`/`build`/`watch`/`doctor`/`migrate`/`mcp` + `chat`/`run`/`dash` + `session`/`handoff`/`trace`/`registry` |
+| `@relay/orchestrator` | Super-Harness | Goal analysis, wave planner, parallel fan-out executor, drivers (CLI + Pi RPC) |
+| `@relay/cli` | All | `login`/`config`/`init`/`build`/`chat`/`run`/`dash` + `session`/`handoff`/`trace`/`mcp`/… |
 
 ## CLI commands
 
-Mesh Brain (Dev A):
+Super-harness:
 
 ```bash
-relay registry list|show <harness>
-relay session start <goal>
-relay session status
+hecate                             # chat REPL — plans a goal, runs agents (relay alias works too)
+hecate login [harness] | --status  # run each subscription's own native login
+hecate config [init]               # relay/orchestrator.yaml: concurrency, routing, models, verify
+hecate run <goal> [--launch]       # low-level orchestration
+hecate dash                        # power-user dashboard
+```
+
+Session + mesh:
+
+```bash
+relay session start <goal> | list | status | resume <id>
 relay handoff --to <harness|auto> [--lossless]
-relay run <goal> [--launch] [--clipboard] [--next] [--status]
-relay trace [session-id]
+relay trace [session-id] [--children]
+relay registry list|show <harness>
 relay doctor --session [id] | --kpi
 ```
 
-Harness Fabric (Dev B):
+Harness fabric:
 
 ```bash
 relay init                         # scaffold relay/, enable detected harnesses
@@ -41,20 +54,6 @@ relay watch                        # rebuild on relay/ changes
 relay doctor [--build]             # generated-file drift vs relay.lock (default)
 relay migrate --from agents-md|claude|codex
 relay mcp install|list             # MCP mesh fabric
-```
-
-## Default: chat mode
-
-```bash
-relay
-```
-
-Type natural language — Relay plans steps and runs agents automatically (Claude, Codex, Cursor, Pi).
-
-```bash
-relay chat                     # same as bare `relay`
-relay dash                     # power-user dashboard (optional)
-relay run <goal> [--launch]    # low-level orchestration (optional)
 ```
 
 ```bash

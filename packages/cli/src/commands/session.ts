@@ -17,6 +17,38 @@ export function registerSessionCommands(program: Command, getCwd: () => string):
     });
 
   session
+    .command("list")
+    .description("List product sessions")
+    .action(async () => {
+      const store = new SessionStore({ rootDir: getCwd() });
+      const [sessions, active] = await Promise.all([store.list(), store.getActive()]);
+      if (sessions.length === 0) {
+        console.log("No sessions yet. Run: relay session start <goal>");
+        return;
+      }
+      for (const s of sessions) {
+        const mark = active?.sessionId === s.sessionId ? "*" : " ";
+        const kin = s.parentId
+          ? " (child)"
+          : s.childIds?.length
+            ? ` (+${s.childIds.length} children)`
+            : "";
+        console.log(`${mark} ${s.sessionId}  ${s.status.padEnd(9)} ${(s.activeHarness ?? "-").padEnd(11)} ${s.goal}${kin}`);
+      }
+    });
+
+  session
+    .command("resume")
+    .description("Make an existing session active")
+    .argument("<id>", "Session id")
+    .action(async (id: string) => {
+      const store = new SessionStore({ rootDir: getCwd() });
+      const session = await store.resume(id);
+      console.log(`Resumed session: ${session.sessionId}`);
+      console.log(`Goal: ${session.goal}`);
+    });
+
+  session
     .command("status")
     .description("Show active session")
     .action(async () => {

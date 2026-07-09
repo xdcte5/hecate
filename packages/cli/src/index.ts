@@ -22,9 +22,10 @@ const program = new Command();
 const getCwd = () => process.cwd();
 
 program
-  .name("relay")
-  .description("Personal dev agent mesh — session, registry, handoff")
-  .version("0.0.1");
+  .name("hecate")
+  .aliases(["relay"])
+  .description("Hecate — personal super-harness: one session across your agent subscriptions")
+  .version("0.1.0");
 
 registerLoginCommands(program, getCwd);
 registerConfigCommands(program, getCwd);

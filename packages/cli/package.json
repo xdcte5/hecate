@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "bin": {
+    "hecate": "./dist/index.js",
     "relay": "./dist/index.js"
   },
   "scripts": {

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Relay are documented here.
+All notable changes to Hecate are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -10,6 +10,28 @@ so the two parallel workstreams stay legible after merge. Per-sprint detail for 
 Harness Fabric track lives in [docs/dev-b-track.md](./docs/dev-b-track.md).
 
 ## [Unreleased]
+
+### Added — Super-Harness: subscriptions, fan-out, deep config
+
+The mesh becomes a **super-harness you log into once** and let fan out across your agent
+subscriptions. Built in five sprints on top of the orchestrator below.
+
+- **Gemini CLI is a 5th harness** — `gemini-cli` across schema, a `GeminiAdapter`
+  (`GEMINI.md` + `.gemini/{agents,skills,commands}` + `.gemini/settings.json` MCP, golden
+  fixture), registry cards + models, and the CLI driver (`gemini -p … --yolo`).
+- **Thin login layer** — `relay login [harness] | --all | --status` runs each harness's
+  **own** native login (stdio inherited) and records who's authenticated in
+  `.relay/auth.json`. Hecate stores no credentials; each tool owns its auth.
+- **Deep customization** — `relay/orchestrator.yaml` (`maxConcurrency`, `subSessions`,
+  per-step-kind `routing`, per-harness `models`, `verify` gate, `login` overrides), wired
+  into the executor (bounded wave concurrency, custom verify gate, routing/model
+  overrides). New `relay config` / `config init` / `config path`.
+- **Isolated child sub-sessions (fan-out)** — RHP gains `parentId`/`childIds`;
+  `SessionStore.startChild`/`mergeChild`/`listChildren`; the executor runs each parallel
+  task in its own child session (isolated events/handoff) and merges results back into the
+  parent. `relay trace --children` shows the lineage.
+- **Rebrand + sessions** — CLI is now `hecate` (with `relay` alias), v0.1.0;
+  `relay session list` / `resume <id>` to review and re-activate Product Sessions.
 
 ### Added — Super-Harness Orchestrator
 
