@@ -261,6 +261,7 @@ export async function runRelayTui(options: RelayTuiOptions): Promise<void> {
           maxConcurrency: orchestratorConfig.maxConcurrency,
           verify: orchestratorConfig.verify,
           routingOverrides: orchestratorConfig.routing,
+          subSessions: orchestratorConfig.subSessions,
           onLine: (row) => emit(row),
         });
 

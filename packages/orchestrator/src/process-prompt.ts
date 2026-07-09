@@ -23,6 +23,7 @@ export type ProcessPromptOptions = {
   maxConcurrency?: number;
   verify?: { enabled?: boolean; command?: string };
   routingOverrides?: Record<string, HarnessId>;
+  subSessions?: boolean;
 };
 
 const HARNESS_LABEL: Record<HarnessId, string> = {
@@ -114,6 +115,7 @@ export async function processPrompt(
     modelOverrides,
     maxConcurrency: options.maxConcurrency,
     verify: options.verify,
+    subSessions: options.subSessions,
     onLine: (line) => {
       push(lines, line, onLine);
     },

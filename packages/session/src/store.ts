@@ -51,6 +51,74 @@ export class SessionStore {
     return session;
   }
 
+  /**
+   * Spawn an isolated child sub-session under `parentId` (fan-out). The child
+   * has its own id, events, and handoff files; the active-session pointer is
+   * left untouched so the parent stays active while children run in parallel.
+   */
+  async startChild(parentId: string, goal: string, harness?: HarnessId): Promise<RhpV1> {
+    const parent = await this.requireSession(parentId);
+    const childHarness = harness ?? this.defaultHarness;
+    const childId = crypto.randomUUID();
+    const child: RhpV1 = { ...emptyRhpV1(childId, goal, childHarness), parentId };
+    await this.save(child);
+    await appendEvent(this.rootDir, childId, {
+      event: "child_started",
+      goal,
+      harness: childHarness,
+    });
+
+    const parentUpdate = mergeRhpPatch(parent, {
+      childIds: [...(parent.childIds ?? []), childId],
+    });
+    await this.save(parentUpdate);
+    await appendEvent(this.rootDir, parentId, {
+      event: "child_spawned",
+      childId,
+      harness: childHarness,
+    });
+
+    return child;
+  }
+
+  /**
+   * Fold a completed child sub-session back into its parent: decisions are
+   * merged (deduped by text) and the child's agent activity is carried over.
+   * The child is marked completed.
+   */
+  async mergeChild(parentId: string, childId: string): Promise<RhpV1> {
+    const [parent, child] = await Promise.all([
+      this.requireSession(parentId),
+      this.requireSession(childId),
+    ]);
+
+    const seen = new Set(parent.decisions.map((d) => d.text));
+    const newDecisions = child.decisions.filter((d) => !seen.has(d.text));
+
+    const updated = mergeRhpPatch(parent, {
+      decisions: [...parent.decisions, ...newDecisions],
+      agents: { ...parent.agents, ...child.agents },
+    });
+    await this.save(updated);
+
+    await this.save(mergeRhpPatch(child, { status: "completed" }));
+    await appendEvent(this.rootDir, parentId, {
+      event: "child_merged",
+      childId,
+      mergedDecisions: newDecisions.length,
+    });
+
+    return updated;
+  }
+
+  /** All child sub-sessions spawned from `parentId`, in creation order. */
+  async listChildren(parentId: string): Promise<RhpV1[]> {
+    const parent = await this.get(parentId);
+    if (!parent?.childIds?.length) return [];
+    const children = await Promise.all(parent.childIds.map((id) => this.get(id)));
+    return children.filter((c): c is RhpV1 => c !== null);
+  }
+
   async getActive(): Promise<RhpV1 | null> {
     try {
       const id = (await fs.readFile(activeSessionPath(this.rootDir), "utf8")).trim();

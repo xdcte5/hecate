@@ -3,7 +3,8 @@ import type { Registry } from "@relay/schema";
 import type { HarnessId } from "@relay/schema";
 import { routeModel } from "@relay/registry";
 import { getHandoffPath, type SessionStore } from "@relay/session";
-import { createDriver } from "./drivers/factory.js";
+import { createDriver as defaultCreateDriver } from "./drivers/factory.js";
+import type { HarnessDriver } from "./drivers/types.js";
 import { verifyWriteOutcome, snapshotWorkingTree } from "./outcome.js";
 import { recordStepOutcome } from "./post-run.js";
 import { groupStepsByWave } from "./plan.js";
@@ -68,6 +69,10 @@ export type ExecutePlanOptions = {
   maxConcurrency?: number;
   /** Verification gate between waves (default: enabled, file-change check). */
   verify?: { enabled?: boolean; command?: string };
+  /** Run parallel tasks as isolated child sub-sessions (default: true). */
+  subSessions?: boolean;
+  /** Driver factory override (tests inject fakes; defaults to the real factory). */
+  createDriver?: (harness: HarnessId, binary: string) => HarnessDriver;
   onLine?: (line: string) => void;
   signal?: AbortSignal;
 };
@@ -88,6 +93,8 @@ async function runSingleStep(
   stepIndex: number,
   totalSteps: number,
   lines: string[],
+  /** Session to prepare the handoff / record progress against (a child when fanned out). */
+  sessionId: string,
 ): Promise<boolean> {
   const { cwd, state, store, registry, failover, modelOverrides, onLine, signal } = options;
 
@@ -140,15 +147,15 @@ async function runSingleStep(
   }
 
   step.binary = resolved.binary;
-  const driver = createDriver(step.harness, resolved.binary);
+  const driver = (options.createDriver ?? defaultCreateDriver)(step.harness, resolved.binary);
   const via = driver.kind === "pi-rpc" ? "Pi RPC" : resolved.binary;
   const runReason = resolved.fallback
     ? `failover (planned ${label(plannedHarness)} via ${plannedReason})`
     : plannedReason;
   push(lines, `  agent: ${via} (${runReason}${formatModelSuffix(step)})`, onLine);
 
-  await store.prepareHandoff(state.sessionId, step.harness);
-  const handoffPath = getHandoffPath(state.sessionId);
+  await store.prepareHandoff(sessionId, step.harness);
+  const handoffPath = getHandoffPath(sessionId);
 
   if (driver.kind === "pi-rpc") {
     push(lines, `  mode: Pi RPC`, onLine);
@@ -201,7 +208,7 @@ async function runSingleStep(
   push(lines, `  ✓ ${result.summary}`, onLine);
 
   try {
-    await recordStepOutcome(cwd, state.sessionId, step.harness, result);
+    await recordStepOutcome(cwd, sessionId, step.harness, result);
   } catch {
     // non-fatal
   }
@@ -218,7 +225,7 @@ async function runSingleStep(
 
 /** Execute plan steps wave-by-wave; agents in the same wave run in parallel. */
 export async function executePlan(options: ExecutePlanOptions): Promise<ExecutePlanResult> {
-  const { cwd, state, onLine, signal } = options;
+  const { cwd, state, store, onLine, signal } = options;
   const lines: string[] = [];
   const waves = groupStepsByWave(state.steps);
   let globalIndex = 0;
@@ -255,18 +262,41 @@ export async function executePlan(options: ExecutePlanOptions): Promise<ExecuteP
       ? options.maxConcurrency
       : waveSteps.length;
     const parallel = waveSteps.length > 1;
+    const useChildren = parallel && options.subSessions !== false;
+
     if (parallel) {
       const limitNote = limit < waveSteps.length ? ` (max ${limit} at once)` : "";
+      const isolation = useChildren ? ", isolated sub-sessions" : "";
       push(
         lines,
-        `▶ Wave ${wave}: ${waveSteps.length} agents in parallel${limitNote}`,
+        `▶ Wave ${wave}: ${waveSteps.length} agents in parallel${limitNote}${isolation}`,
         onLine,
       );
     }
 
+    // Create one child sub-session per parallel step *sequentially* so the
+    // parent's childIds write doesn't race, then run the steps concurrently.
+    const sessionIds: string[] = [];
+    if (useChildren) {
+      for (const step of waveSteps) {
+        const child = await store.startChild(state.sessionId, step.task, step.harness);
+        sessionIds.push(child.sessionId);
+      }
+    } else {
+      for (const _ of waveSteps) sessionIds.push(state.sessionId);
+    }
+
     const outcomes = await runWithConcurrency(waveSteps, limit, (step, offset) =>
-      runSingleStep(options, step, globalIndex + offset, state.steps.length, lines),
+      runSingleStep(options, step, globalIndex + offset, state.steps.length, lines, sessionIds[offset]!),
     );
+
+    // Merge children back into the parent sequentially (avoids parent write races).
+    if (useChildren) {
+      for (const childId of sessionIds) {
+        await store.mergeChild(state.sessionId, childId);
+      }
+      push(lines, `  ⇲ merged ${sessionIds.length} sub-sessions into the parent`, onLine);
+    }
 
     if (!outcomes.every(Boolean)) {
       return { ok: false, state };

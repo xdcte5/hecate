@@ -39,6 +39,8 @@ export function mergeRhpPatch(base: RhpV1, patch: RhpV1Patch): RhpV1 {
     ...(patch.git !== undefined ? { git: patch.git } : {}),
     agents: safeMergeAgents(base.agents, patch.agents),
     ...(patch.handoffSeq !== undefined ? { handoffSeq: patch.handoffSeq } : {}),
+    ...(patch.parentId !== undefined ? { parentId: patch.parentId } : {}),
+    ...(patch.childIds !== undefined ? { childIds: patch.childIds } : {}),
     updated_at: new Date().toISOString(),
   };
 }

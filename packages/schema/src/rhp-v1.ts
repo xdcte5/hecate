@@ -51,6 +51,10 @@ export const RhpV1Schema = z.object({
   git: GitSnapshotSchema.optional(),
   agents: z.record(z.string(), AgentRecordSchema),
   handoffSeq: z.number().int().nonnegative(),
+  /** Parent session id when this is a fanned-out child sub-session. */
+  parentId: z.string().optional(),
+  /** Child sub-session ids spawned from this session (fan-out). */
+  childIds: z.array(z.string()).optional(),
 });
 export type RhpV1 = z.infer<typeof RhpV1Schema>;
 

@@ -19,7 +19,8 @@ export function registerTraceCommands(program: Command, getCwd: () => string): v
     .description("Show session event timeline")
     .argument("[session-id]", "Session id (defaults to active session)")
     .option("--otel", "Pro: export trace as OpenTelemetry (coming in v0.2)")
-    .action(async (sessionId: string | undefined, options: { otel?: boolean }) => {
+    .option("--children", "Also print each fanned-out child sub-session's timeline")
+    .action(async (sessionId: string | undefined, options: { otel?: boolean; children?: boolean }) => {
       gateProFeature("OTel trace export (--otel)", Boolean(options.otel));
       const cwd = getCwd();
       const store = new SessionStore({ rootDir: cwd });
@@ -33,8 +34,12 @@ export function registerTraceCommands(program: Command, getCwd: () => string): v
         id = active.sessionId;
       }
 
+      const session = await store.get(id);
       const events = await readEvents(cwd, id);
       console.log(`Session: ${id}`);
+      if (session?.parentId) console.log(`Parent:  ${session.parentId}`);
+      const childIds = session?.childIds ?? [];
+      if (childIds.length) console.log(`Children: ${childIds.length}`);
       console.log(`Events: ${events.length}`);
       console.log("");
 
@@ -43,6 +48,21 @@ export function registerTraceCommands(program: Command, getCwd: () => string): v
         const type = typeof event.event === "string" ? event.event : "?";
         const fields = formatKeyFields(event);
         console.log(`${at}  ${type}${fields ? `  ${fields}` : ""}`);
+      }
+
+      if (options.children && childIds.length) {
+        for (const childId of childIds) {
+          const child = await store.get(childId);
+          const childEvents = await readEvents(cwd, childId);
+          console.log("");
+          console.log(`└─ child ${childId} [${child?.activeHarness ?? "?"}] — ${child?.goal ?? ""}`);
+          for (const event of childEvents) {
+            const at = typeof event.at === "string" ? event.at : "?";
+            const type = typeof event.event === "string" ? event.event : "?";
+            const fields = formatKeyFields(event);
+            console.log(`   ${at}  ${type}${fields ? `  ${fields}` : ""}`);
+          }
+        }
       }
     });
 }
