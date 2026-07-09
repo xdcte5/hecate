@@ -1,0 +1,50 @@
+harnesses:
+  - id: claude-code
+    strengths:
+      - architecture
+      - refactoring
+      - complex reasoning
+      - system design
+    weaknesses:
+      - quick edits
+      - unit tests
+    binaries:
+      - claude
+
+  - id: codex
+    strengths:
+      - unit tests
+      - test generation
+      - api design
+      - typescript
+    weaknesses:
+      - ui work
+      - frontend styling
+    binaries:
+      - codex
+
+  - id: cursor
+    strengths:
+      - react
+      - frontend
+      - component fixes
+      - ide integration
+      - jsx
+      - tsx
+    weaknesses:
+      - long-running tasks
+      - deep architecture
+    binaries:
+      - cursor-agent
+
+  - id: pi
+    strengths:
+      - scripts
+      - automation
+      - cli
+      - lightweight tasks
+    binaries:
+      - pi
+    weaknesses:
+      - complex codebases
+      - multi-file refactors

@@ -1,0 +1,15 @@
+# Project instructions
+
+This is the `minimal-relay` fixture — the canonical `relay/` source that every adapter
+transpiles into a harness-native layout.
+
+## Conventions
+
+- TypeScript, Node 22+, ESM only.
+- Prefer small, pure functions; keep side effects at the edges.
+- Every generated file is manifest-owned — edit `relay/`, never the output.
+
+## Testing
+
+- Vitest with golden-file fixtures per adapter.
+- Run `pnpm test` before every handoff.
