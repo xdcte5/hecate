@@ -70,8 +70,8 @@ Adapted from [ide-bridge](https://github.com/Xsidz/ide-bridge) (MIT) — see `pa
 | `@relay/registry` | Dev A | Done |
 | `@relay/session` | Dev A | Done |
 | `@relay/cli` | Dev A (session/registry/handoff/trace/doctor) | Done |
-| `@relay/adapters` | Dev B | Sprint 2 (4 adapters, session inject, watch) |
-| `@relay/mcp` | Dev B | Not started (Sprint 3) |
+| `@relay/adapters` | Dev B | Sprint 3 (4 adapters, mcp-transform round-trip) |
+| `@relay/mcp` | Dev B | Sprint 3 (relay-mcp stdio, 5 tools) |
 
 ## Pro features (stubs)
 

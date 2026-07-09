@@ -8,6 +8,8 @@ import { registerDoctorCommands } from "./commands/doctor.js";
 import { registerInitCommands } from "./commands/init.js";
 import { registerBuildCommands } from "./commands/build.js";
 import { registerWatchCommands } from "./commands/watch.js";
+import { registerMcpCommands } from "./commands/mcp.js";
+import { registerMigrateCommands } from "./commands/migrate.js";
 
 const program = new Command();
 const getCwd = () => process.cwd();
@@ -20,6 +22,8 @@ program
 registerInitCommands(program, getCwd);
 registerBuildCommands(program, getCwd);
 registerWatchCommands(program, getCwd);
+registerMcpCommands(program, getCwd);
+registerMigrateCommands(program, getCwd);
 registerRegistryCommands(program, getCwd);
 registerSessionCommands(program, getCwd);
 registerHandoffCommands(program, getCwd);

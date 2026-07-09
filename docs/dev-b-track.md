@@ -44,13 +44,13 @@ Legend: ☐ pending · ◐ in progress · ☑ done
 
 ### Sprint 3 — MCP mesh fabric
 
-- ☐ `packages/mcp`: `relay-mcp` stdio server (no HTTP daemon)
-- ☐ MCP tools: `session_get`, `session_record_decision`, `session_record_progress`,
+- ☑ `packages/mcp`: `relay-mcp` stdio server (no HTTP daemon)
+- ☑ MCP tools: `session_get`, `session_record_decision`, `session_record_progress`,
   `handoff_prepare`, `registry_list` (call into `@relay/session` / `@relay/registry`)
-- ☐ `mcp-transform.ts` full — Claude JSON ↔ Codex TOML ↔ Cursor JSON round-trip tests
-- ☐ CLI: `relay mcp install`, `relay mcp list` (virtual merged surface)
-- ☐ `relay migrate --from agents-md`
-- ☐ Golden tests for MCP config output per harness
+- ☑ `mcp-transform.ts` full — Claude JSON ↔ Codex TOML ↔ Cursor JSON round-trip tests
+- ☑ CLI: `relay mcp install`, `relay mcp list` (virtual merged surface)
+- ☑ `relay migrate --from agents-md`
+- ☑ Golden tests for MCP config output per harness
 
 **Exit:** `session_record_decision` via MCP lands in `events.jsonl` and the next handoff.
 

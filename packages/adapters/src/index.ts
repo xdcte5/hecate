@@ -19,7 +19,14 @@ export { CodexAdapter } from "./codex.js";
 export { CursorAdapter } from "./cursor.js";
 export { PiAdapter } from "./pi.js";
 
-export { toClaudeJson, toCodexToml, toCursorJson } from "./mcp-transform.js";
+export {
+  toClaudeJson,
+  toCodexToml,
+  toCursorJson,
+  fromClaudeJson,
+  fromCodexToml,
+  fromCursorJson,
+} from "./mcp-transform.js";
 
 export {
   type BuildOptions,

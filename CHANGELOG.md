@@ -39,6 +39,21 @@ Harness Fabric track lives in [docs/dev-b-track.md](./docs/dev-b-track.md).
 - Golden fixtures extended to all 4 harnesses; new `build.test.ts` covers inject,
   conflict detection, and pi-global.
 
+**Sprint 3 — MCP mesh fabric**
+
+- `@relay/mcp`: new package — `relay-mcp` stdio server + five tools (`session_get`,
+  `session_record_decision`, `session_record_progress`, `handoff_prepare`,
+  `registry_list`) that call into `@relay/session` and `@relay/registry`. SDK-free tool
+  handlers are unit-tested; `bin.ts` serves over `StdioServerTransport`.
+- `@relay/adapters`: `mcp-transform` round-trip — added `fromClaudeJson`, `fromCursorJson`,
+  and a narrow `fromCodexToml` parser with cross-format round-trip tests.
+- `@relay/cli`: `relay mcp install` (writes MCP config incl. a `relay` server into all
+  harnesses), `relay mcp list` (merged virtual surface), and `relay migrate --from
+  agents-md` (imports AGENTS.md + agents/skills/prompts/mcp into `relay/`). Shared
+  scaffold defaults factored into `scaffold.ts`.
+- Verified end-to-end: a decision recorded via the stdio MCP server lands in
+  `events.jsonl` and the next handoff.
+
 ### Added — Mesh Brain (Dev A)
 
 - `@relay/schema`: RHP v1, HandoffBundle, registry, session-policy, relay config Zod types.

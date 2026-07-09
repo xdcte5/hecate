@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { toClaudeJson, toCodexToml } from "./mcp-transform.js";
+import {
+  fromClaudeJson,
+  fromCodexToml,
+  fromCursorJson,
+  toClaudeJson,
+  toCodexToml,
+  toCursorJson,
+} from "./mcp-transform.js";
 import type { McpConfig } from "./source.js";
 
 const config: McpConfig = {
@@ -33,5 +40,31 @@ describe("toCodexToml", () => {
 
   it("returns empty string for no servers", () => {
     expect(toCodexToml({ mcpServers: {} })).toBe("");
+  });
+});
+
+describe("round-trips (Claude JSON ↔ Codex TOML ↔ Cursor JSON)", () => {
+  const normalized: McpConfig = {
+    mcpServers: {
+      relay: { command: "relay-mcp", args: [] },
+      weather: { command: "weather-mcp", args: ["--units", "c"], env: { API_KEY: "x" } },
+    },
+  };
+
+  it("Claude JSON survives a round-trip", () => {
+    expect(fromClaudeJson(toClaudeJson(normalized))).toEqual(normalized);
+  });
+
+  it("Cursor JSON survives a round-trip", () => {
+    expect(fromCursorJson(toCursorJson(normalized))).toEqual(normalized);
+  });
+
+  it("Codex TOML survives a round-trip", () => {
+    expect(fromCodexToml(toCodexToml(normalized))).toEqual(normalized);
+  });
+
+  it("crosses formats: Claude JSON → Codex TOML → Cursor JSON", () => {
+    const viaToml = fromCodexToml(toCodexToml(fromClaudeJson(toClaudeJson(normalized))));
+    expect(fromCursorJson(toCursorJson(viaToml))).toEqual(normalized);
   });
 });

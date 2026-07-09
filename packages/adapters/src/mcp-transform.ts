@@ -35,6 +35,15 @@ function tomlStringArray(values: string[]): string {
   return `[${values.map(tomlString).join(", ")}]`;
 }
 
+/** Parse a Claude/Cursor `mcpServers` JSON document back into an McpConfig. */
+export function fromClaudeJson(json: string): McpConfig {
+  const parsed = JSON.parse(json) as Partial<McpConfig>;
+  return { mcpServers: parsed.mcpServers ?? {} };
+}
+
+/** Cursor uses the same JSON shape as Claude. */
+export const fromCursorJson = fromClaudeJson;
+
 /** Codex `.codex/config.toml` — `[mcp_servers.<name>]` tables. */
 export function toCodexToml(config: McpConfig): string {
   const blocks: string[] = [];
@@ -53,4 +62,56 @@ export function toCodexToml(config: McpConfig): string {
     }
   }
   return blocks.length > 0 ? `${blocks.join("\n\n")}\n` : "";
+}
+
+function parseTomlString(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith('"')) return trimmed;
+  return trimmed.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+}
+
+function parseTomlStringArray(raw: string): string[] {
+  const inner = raw.trim().replace(/^\[/, "").replace(/\]$/, "").trim();
+  if (inner.length === 0) return [];
+  return inner.split(",").map((item) => parseTomlString(item));
+}
+
+/**
+ * Parse the narrow `[mcp_servers.<name>]` TOML that {@link toCodexToml} emits
+ * back into an McpConfig. Not a general TOML parser — it round-trips Relay's
+ * own output.
+ */
+export function fromCodexToml(toml: string): McpConfig {
+  const servers: Record<string, McpServer> = {};
+  let currentName: string | null = null;
+  let inEnv = false;
+
+  for (const line of toml.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) continue;
+
+    const header = /^\[mcp_servers\.([^\].]+)(\.env)?\]$/.exec(trimmed);
+    if (header) {
+      currentName = header[1]!;
+      inEnv = header[2] === ".env";
+      if (!servers[currentName]) servers[currentName] = { command: "", args: [] };
+      if (inEnv && !servers[currentName]!.env) servers[currentName]!.env = {};
+      continue;
+    }
+
+    const kv = /^([A-Za-z0-9_]+)\s*=\s*(.+)$/.exec(trimmed);
+    if (!kv || !currentName) continue;
+    const [, key, value] = kv;
+    const server = servers[currentName]!;
+
+    if (inEnv) {
+      server.env![key!] = parseTomlString(value!);
+    } else if (key === "command") {
+      server.command = parseTomlString(value!);
+    } else if (key === "args") {
+      server.args = parseTomlStringArray(value!);
+    }
+  }
+
+  return { mcpServers: servers };
 }
