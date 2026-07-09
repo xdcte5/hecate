@@ -1,0 +1,3 @@
+# Relay project config — Dev A owns activeSessionId
+version: "1"
+activeSessionId: "98479005-9de3-4d35-b3a6-50f8b92fd347"
