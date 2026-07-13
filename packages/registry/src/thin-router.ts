@@ -2,7 +2,7 @@ import type { HarnessId, Registry, SessionPolicy } from "@relay/schema";
 import { ModelRouter, type RouteModelReason, type RouteModelResult } from "./model-router.js";
 import { TaskRouter, routeTask, type RouteTaskReason, type RouteTaskResult } from "./task-router.js";
 
-export type SelectHarnessReason = RouteTaskReason;
+export type SelectHarnessReason = RouteTaskReason | "capability-match";
 
 export interface SelectHarnessResult {
   harness: HarnessId;

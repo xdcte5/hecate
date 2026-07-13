@@ -63,7 +63,7 @@ const PREFIX: Record<TranscriptKind, string> = {
   agent: `${ANSI.yellow}agent${ANSI.reset}`,
   error: `${ANSI.red}err${ANSI.reset}`,
   success: `${ANSI.green}ok${ANSI.reset}`,
-  info: `${ANSI.dim}relay${ANSI.reset}`,
+  info: `${ANSI.dim}hecate${ANSI.reset}`,
 };
 
 export function formatTranscriptEntry(entry: TranscriptEntry): string {
@@ -80,13 +80,31 @@ export function parseOrchestratorLine(line: string): TranscriptEntry {
   return { kind, text: line.trim(), raw: line };
 }
 
-export function formatRelayBanner(goal?: string): string {
+/** Pixel-block letters for the launch banner, one glyph per key, 5 rows tall. */
+const BANNER_GLYPHS: Record<string, string[]> = {
+  H: ["█  █", "█  █", "████", "█  █", "█  █"],
+  E: ["████", "█   ", "███ ", "█   ", "████"],
+  C: ["████", "█   ", "█   ", "█   ", "████"],
+  A: ["████", "█  █", "████", "█  █", "█  █"],
+  T: ["█████", "  █  ", "  █  ", "  █  ", "  █  "],
+};
+
+/** Render "HECATE" as a pixelated block banner. */
+export function formatHecateBanner(goal?: string): string {
+  const letters = "HECATE".split("").map((ch) => BANNER_GLYPHS[ch]!);
+  const rows: string[] = [];
+  for (let row = 0; row < 5; row += 1) {
+    const line = letters.map((glyph) => glyph[row]).join("  ");
+    rows.push(`${ANSI.bold}${ANSI.magenta}${line}${ANSI.reset}`);
+  }
+
   const goalLine = goal
     ? `${ANSI.dim}goal${ANSI.reset} ${ANSI.bold}${goal.slice(0, 60)}${goal.length > 60 ? "…" : ""}${ANSI.reset}`
-    : `${ANSI.dim}type what you want to build${ANSI.reset}`;
+    : `${ANSI.dim}type what you want to build — Ctrl+C twice to quit${ANSI.reset}`;
   return (
-    `${ANSI.bold}${ANSI.cyan}Relay${ANSI.reset} ${ANSI.dim}· personal dev agent mesh${ANSI.reset}\n` +
+    `${rows.join("\n")}\n\n` +
+    `${ANSI.dim}· personal super-harness across your agent subscriptions${ANSI.reset}\n` +
     `${goalLine}\n` +
-    `${ANSI.dim}commands: status · agents · models · config · quit${ANSI.reset}`
+    `${ANSI.dim}commands: status · agents · models · config${ANSI.reset}`
   );
 }

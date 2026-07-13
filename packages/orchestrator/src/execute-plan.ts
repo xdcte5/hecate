@@ -1,7 +1,6 @@
 import { buildProject } from "@relay/adapters";
 import type { Registry } from "@relay/schema";
 import type { HarnessId } from "@relay/schema";
-import { routeModel } from "@relay/registry";
 import { getHandoffPath, type SessionStore } from "@relay/session";
 import { createDriver as defaultCreateDriver } from "./drivers/factory.js";
 import type { HarnessDriver } from "./drivers/types.js";
@@ -44,7 +43,7 @@ const HARNESS_LABEL: Record<HarnessId, string> = {
   codex: "Codex",
   cursor: "Cursor",
   pi: "Pi",
-  "gemini-cli": "Gemini",
+  "antigravity": "Antigravity",
 };
 
 function label(id: HarnessId): string {
@@ -74,6 +73,8 @@ export type ExecutePlanOptions = {
   /** Driver factory override (tests inject fakes; defaults to the real factory). */
   createDriver?: (harness: HarnessId, binary: string) => HarnessDriver;
   onLine?: (line: string) => void;
+  /** The user-facing answer/result (or error), separate from the verbose trace. */
+  onResponse?: (text: string, kind: "answer" | "error") => void;
   signal?: AbortSignal;
 };
 
@@ -96,7 +97,7 @@ async function runSingleStep(
   /** Session to prepare the handoff / record progress against (a child when fanned out). */
   sessionId: string,
 ): Promise<boolean> {
-  const { cwd, state, store, registry, failover, modelOverrides, onLine, signal } = options;
+  const { cwd, state, store, registry, failover, modelOverrides, onLine, onResponse, signal } = options;
 
   if (signal?.aborted) {
     push(lines, "Cancelled.", onLine);
@@ -118,6 +119,7 @@ async function runSingleStep(
     step.finishedAt = new Date().toISOString();
     await saveRunState(cwd, state);
     push(lines, `  ✗ No agent CLI found (install pi, claude, or codex)`, onLine);
+    onResponse?.("No agent CLI found on PATH (install pi, claude, codex, or agy).", "error");
     return false;
   }
 
@@ -134,17 +136,12 @@ async function runSingleStep(
       onLine,
     );
     step.harness = resolved.harness;
-    if (!modelOverrides?.[step.harness]) {
-      const modelRoute = routeModel(step.task, step.harness, registry);
-      step.model = modelRoute.modelId;
-      step.modelReason = modelRoute.reason;
-    }
   }
 
-  if (modelOverrides?.[step.harness]) {
-    step.model = modelOverrides[step.harness];
-    step.modelReason = "default";
-  }
+  // Only pass a model the user explicitly pinned; otherwise let the harness use
+  // its own configured default so we never force a provider it isn't authed for.
+  step.model = modelOverrides?.[step.harness];
+  step.modelReason = "default";
 
   step.binary = resolved.binary;
   const driver = (options.createDriver ?? defaultCreateDriver)(step.harness, resolved.binary);
@@ -185,6 +182,7 @@ async function runSingleStep(
         push(lines, `  │ ${row}`, onLine);
       }
     }
+    onResponse?.(result.output ? `${result.summary}\n${result.output}` : result.summary, "error");
     return false;
   }
 
@@ -206,6 +204,7 @@ async function runSingleStep(
   step.finishedAt = new Date().toISOString();
   await saveRunState(cwd, state);
   push(lines, `  ✓ ${result.summary}`, onLine);
+  onResponse?.(result.output?.trim() || result.summary, "answer");
 
   try {
     await recordStepOutcome(cwd, sessionId, step.harness, result);

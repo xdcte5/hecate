@@ -9,7 +9,7 @@ import { ClaudeAdapter } from "./claude.js";
 import { CodexAdapter } from "./codex.js";
 import { CursorAdapter } from "./cursor.js";
 import { PiAdapter } from "./pi.js";
-import { GeminiAdapter } from "./gemini.js";
+import { AntigravityAdapter } from "./antigravity.js";
 import {
   buildAdapterManifest,
   buildRelayLock,
@@ -24,7 +24,7 @@ const ADAPTERS: Record<HarnessId, Adapter | undefined> = {
   codex: new CodexAdapter(),
   cursor: new CursorAdapter(),
   pi: new PiAdapter(),
-  "gemini-cli": new GeminiAdapter(),
+  antigravity: new AntigravityAdapter(),
 };
 
 export function getAdapter(harness: HarnessId): Adapter {

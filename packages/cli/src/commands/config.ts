@@ -27,7 +27,7 @@ routing:
 # Pin a model per harness (overrides ability-based model routing).
 models:
   claude-code: claude-opus-4-6
-  gemini-cli: gemini-2.5-pro
+  antigravity: "Gemini 3.1 Pro (High)"
 
 # Verification gate between waves.
 verify:
@@ -36,7 +36,7 @@ verify:
 
 # Override a harness's native login command (args passed to its binary).
 login:
-  gemini-cli: [auth, login]
+  antigravity: []
 `;
 
 export function registerConfigCommands(program: Command, getCwd: () => string): void {

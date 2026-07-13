@@ -75,5 +75,5 @@ export const DEFAULT_LOGIN_ARGS: Record<HarnessId, string[]> = {
   codex: ["login"],
   cursor: ["login"],
   pi: ["auth", "login"],
-  "gemini-cli": ["auth", "login"],
+  antigravity: [],
 };

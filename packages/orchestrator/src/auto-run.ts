@@ -14,16 +14,20 @@ export type AutoRunRequest = {
   timeoutMs?: number;
   signal?: AbortSignal;
   onOutput?: (line: string) => void;
+  /** Run this exact prompt instead of the autonomous handoff prompt (planning/chat). */
+  promptOverride?: string;
 };
 
 export type AutoRunResult = {
   ok: boolean;
   summary: string;
   output?: string;
+  /** Full captured stdout — needed when the caller must read complete output (e.g. plan JSON). */
+  stdout?: string;
 };
 
-function buildPrompt(task: string, handoffPath: string): string {
-  return buildAgentPrompt(task, handoffPath);
+function buildPrompt(task: string, handoffPath: string, override?: string): string {
+  return override ?? buildAgentPrompt(task, handoffPath);
 }
 
 function cleanAgentEnv(): NodeJS.ProcessEnv {
@@ -58,7 +62,7 @@ function killChild(child: ChildProcess): void {
 
 /** Run a harness non-interactively, stream output, and wait for completion. */
 export async function runHarnessAuto(request: AutoRunRequest): Promise<AutoRunResult> {
-  const prompt = buildPrompt(request.task, request.handoffPath);
+  const prompt = buildPrompt(request.task, request.handoffPath, request.promptOverride);
   const dir = join(request.cwd, ".relay", "launch");
   await mkdir(dir, { recursive: true });
   await writeFile(join(dir, "prompt.txt"), prompt, "utf8");
@@ -144,6 +148,7 @@ export async function runHarnessAuto(request: AutoRunRequest): Promise<AutoRunRe
           ok: true,
           summary: `${request.harness} finished.`,
           output: tail || undefined,
+          stdout: stdout || undefined,
         });
         return;
       }
@@ -152,6 +157,7 @@ export async function runHarnessAuto(request: AutoRunRequest): Promise<AutoRunRe
         ok: false,
         summary: `${request.harness} failed (exit ${code ?? "?"}).`,
         output: tail || stderr.trim() || undefined,
+        stdout: stdout || undefined,
       });
     });
   });

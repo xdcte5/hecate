@@ -68,7 +68,7 @@ export function createRelayMcpServer(ctx: ToolContext): McpServer {
       title: "Prepare handoff",
       description: "Build an RHP handoff bundle targeting a harness.",
       inputSchema: {
-        to: z.enum(["claude-code", "codex", "cursor", "pi", "gemini-cli"]),
+        to: z.enum(["claude-code", "codex", "cursor", "pi", "antigravity"]),
         sessionId: z.string().optional(),
       },
     },

@@ -1,16 +1,12 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import readline from "node:readline";
 import type { HarnessId, Registry } from "@relay/schema";
-
-const execFileAsync = promisify(execFile);
+import type { ModalController, ModalStep } from "./modal.js";
 
 const HARNESS_LABEL: Record<HarnessId, string> = {
   "claude-code": "Claude Code",
   codex: "Codex",
   cursor: "Cursor",
   pi: "Pi",
-  "gemini-cli": "Gemini",
+  "antigravity": "Antigravity",
 };
 
 export type ModelChoice = {
@@ -25,46 +21,24 @@ export function getRegistryModels(registry: Registry, harness: HarnessId): strin
   return card?.models?.map((model) => model.id) ?? [];
 }
 
+/**
+ * Model choices for a harness. We use the curated registry list rather than
+ * scraping `--help` — help text varies wildly per CLI and produced bogus
+ * entries (e.g. the word "Model" from a flag description).
+ */
 export async function discoverHarnessModels(
   harness: HarnessId,
   registry: Registry,
-  binary?: string,
+  _binary?: string,
 ): Promise<{ models: string[]; limitation?: string }> {
   const known = getRegistryModels(registry, harness);
-
   if (harness === "cursor") {
     return {
       models: known,
       limitation: "Cursor CLI has no --model flag; override shown in plan only.",
     };
   }
-
-  if (!binary) {
-    return { models: known };
-  }
-
-  try {
-    const { stdout } = await execFileAsync(binary, ["--help"], {
-      timeout: 5000,
-      maxBuffer: 256 * 1024,
-    });
-    const fromHelp = parseModelsFromHelp(stdout);
-    const merged = [...new Set([...known, ...fromHelp])];
-    return { models: merged.length > 0 ? merged : known };
-  } catch {
-    return { models: known };
-  }
-}
-
-function parseModelsFromHelp(text: string): string[] {
-  const models: string[] = [];
-  const modelFlag = /--model[=\s]+([^\s,\]]+)/gi;
-  let match: RegExpExecArray | null;
-  while ((match = modelFlag.exec(text)) !== null) {
-    const id = match[1]!.replace(/["']/g, "");
-    if (id && !id.startsWith("<")) models.push(id);
-  }
-  return models;
+  return { models: known };
 }
 
 export function formatModelChoices(choices: ModelChoice[]): string[] {
@@ -84,59 +58,64 @@ export function formatModelChoices(choices: ModelChoice[]): string[] {
   return lines;
 }
 
-export async function promptModelSelection(
-  choices: ModelChoice[],
-  output: NodeJS.WriteStream = process.stdout,
-  input: NodeJS.ReadStream = process.stdin,
-): Promise<Partial<Record<HarnessId, string>>> {
-  const overrides: Partial<Record<HarnessId, string>> = {};
+/**
+ * Modal that walks each harness that has selectable models and asks for an
+ * override (number, model id, or Enter for auto). Driven by the TUI's single
+ * readline — no nested stdin reader.
+ */
+export class ModelPickerModal implements ModalController<Partial<Record<HarnessId, string>>> {
+  private index = 0;
+  private readonly overrides: Partial<Record<HarnessId, string>> = {};
 
-  return new Promise((resolve) => {
-    const rl = readline.createInterface({ input, output, terminal: true });
-    let index = 0;
+  constructor(
+    private readonly choices: ModelChoice[],
+    private readonly write: (text: string) => void,
+  ) {}
 
-    const askNext = () => {
-      while (index < choices.length) {
-        const choice = choices[index]!;
-        if (choice.limitation || choice.models.length === 0) {
-          index += 1;
-          continue;
-        }
-        const label = HARNESS_LABEL[choice.harness];
-        output.write(`\n${label} model (auto=Enter):\n`);
-        choice.models.forEach((m, i) => output.write(`  ${i + 1}. ${m}\n`));
-        output.write(`Pick number, type model id, or Enter for auto: `);
-        return;
+  /** At least one harness has models to override. */
+  get hasSelectableModels(): boolean {
+    return this.choices.some((c) => !c.limitation && c.models.length > 0);
+  }
+
+  render(): void {
+    this.promptCurrent();
+  }
+
+  /** Advance to the next harness with models and prompt for it. */
+  private promptCurrent(): boolean {
+    while (this.index < this.choices.length) {
+      const choice = this.choices[this.index]!;
+      if (choice.limitation || choice.models.length === 0) {
+        this.index += 1;
+        continue;
       }
-      rl.close();
-      resolve(overrides);
-    };
+      const label = HARNESS_LABEL[choice.harness];
+      this.write(`\n${label} model (Enter = auto):\n`);
+      choice.models.forEach((m, i) => this.write(`  ${i + 1}. ${m}\n`));
+      this.write(`Pick a number, or Enter for auto: `);
+      return true;
+    }
+    return false;
+  }
 
-    rl.on("line", (line) => {
-      const trimmed = line.trim();
-      const choice = choices[index];
-      if (!choice) {
-        rl.close();
-        resolve(overrides);
-        return;
-      }
+  handleLine(line: string): ModalStep<Partial<Record<HarnessId, string>>> {
+    const choice = this.choices[this.index];
+    if (!choice) return { done: true, result: this.overrides };
 
-      if (!trimmed) {
-        index += 1;
-        askNext();
-        return;
-      }
-
+    const trimmed = line.trim();
+    if (trimmed) {
       const num = Number.parseInt(trimmed, 10);
-      if (Number.isFinite(num) && num >= 1 && num <= choice.models.length) {
-        overrides[choice.harness] = choice.models[num - 1]!;
-      } else {
-        overrides[choice.harness] = trimmed;
+      if (!Number.isFinite(num) || num < 1 || num > choice.models.length) {
+        // Reject free text (e.g. a mistyped command) instead of saving it as a model id.
+        this.write(`  Enter a number 1-${choice.models.length}, or press Enter for auto.\n`);
+        this.write(`Pick a number, or Enter for auto: `);
+        return { done: false };
       }
-      index += 1;
-      askNext();
-    });
+      this.overrides[choice.harness] = choice.models[num - 1]!;
+    }
 
-    askNext();
-  });
+    this.index += 1;
+    if (this.promptCurrent()) return { done: false };
+    return { done: true, result: this.overrides };
+  }
 }

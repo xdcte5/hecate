@@ -1,5 +1,7 @@
 harnesses:
   - id: claude-code
+    planning: 9
+    conversation: 8
     strengths:
       - architecture
       - refactoring
@@ -13,12 +15,16 @@ harnesses:
       - claude
     models:
       - id: claude-sonnet-4-6
+        planning: 7
+        conversation: 8
         strengths:
           - frontend
           - implementation
           - reasoning
           - debugging
       - id: claude-opus-4-6
+        planning: 10
+        conversation: 8
         strengths:
           - architecture
           - refactoring
@@ -26,6 +32,8 @@ harnesses:
           - system design
 
   - id: codex
+    planning: 6
+    conversation: 5
     strengths:
       - unit tests
       - test generation
@@ -39,11 +47,15 @@ harnesses:
       - codex
     models:
       - id: o4-mini
+        planning: 4
+        conversation: 4
         strengths:
           - unit tests
           - test generation
           - quick tasks
       - id: o3
+        planning: 8
+        conversation: 6
         strengths:
           - api design
           - typescript
@@ -51,6 +63,8 @@ harnesses:
           - backend
 
   - id: cursor
+    planning: 4
+    conversation: 4
     strengths:
       - react
       - frontend
@@ -69,6 +83,8 @@ harnesses:
       - cursor-agent
     models:
       - id: composer-2
+        planning: 3
+        conversation: 4
         strengths:
           - react
           - frontend
@@ -79,12 +95,21 @@ harnesses:
           - graph
           - visualization
       - id: gpt-5.3-codex
+        planning: 5
+        conversation: 5
         strengths:
           - implementation
           - debugging
           - backend
 
   - id: pi
+    planning: 6
+    conversation: 6
+    # Pi owns its own tool loop and extension system — route to it when a step
+    # needs those, not merely as a failover target.
+    capabilities:
+      - native-tool-loop
+      - extensions
     strengths:
       - implementation
       - greenfield
@@ -99,14 +124,63 @@ harnesses:
       - complex refactors
     models:
       - id: claude-sonnet-4-6
+        planning: 7
+        conversation: 7
+        capabilities:
+          - native-tool-loop
+          - extensions
         strengths:
           - implementation
           - greenfield
           - scaffolding
           - full-stack
       - id: gpt-4o
+        planning: 4
+        conversation: 6
+        capabilities:
+          - native-tool-loop
+          - extensions
         strengths:
           - scripts
           - automation
           - cli
           - shell
+
+  - id: antigravity
+    planning: 8
+    conversation: 8
+    strengths:
+      - long-context
+      - research
+      - multimodal
+      - large codebases
+      - documentation
+      - reasoning
+    weaknesses:
+      - unit tests
+    binaries:
+      - agy
+    models:
+      - id: "Gemini 3.1 Pro (High)"
+        planning: 9
+        conversation: 8
+        strengths:
+          - long-context
+          - research
+          - multimodal
+          - reasoning
+          - large codebases
+      - id: "Claude Sonnet 4.6 (Thinking)"
+        planning: 8
+        conversation: 8
+        strengths:
+          - implementation
+          - reasoning
+          - debugging
+      - id: "Gemini 3.5 Flash (High)"
+        planning: 4
+        conversation: 7
+        strengths:
+          - quick tasks
+          - summarization
+          - scripts

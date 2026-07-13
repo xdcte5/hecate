@@ -111,7 +111,7 @@ harnesses:
           - cli
           - shell
 
-  - id: gemini-cli
+  - id: antigravity
     strengths:
       - long-context
       - research
@@ -119,18 +119,18 @@ harnesses:
       - large codebases
       - documentation
     binaries:
-      - gemini
+      - agy
     weaknesses:
-      - agentic editing
+      - unit tests
     models:
-      - id: gemini-2.5-pro
+      - id: "Gemini 3.1 Pro (High)"
         strengths:
           - long-context
           - research
           - multimodal
           - reasoning
           - large codebases
-      - id: gemini-2.5-flash
+      - id: "Gemini 3.5 Flash (High)"
         strengths:
           - quick tasks
           - summarization

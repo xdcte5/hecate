@@ -6,6 +6,9 @@ import type { HarnessId, ModelCard } from "@relay/schema";
 
 export interface DefaultCard {
   id: HarnessId;
+  planning?: number;
+  conversation?: number;
+  capabilities?: string[];
   strengths: string[];
   weaknesses: string[];
   binaries: string[];
@@ -16,43 +19,70 @@ export const DEFAULT_MODELS: Record<HarnessId, ModelCard[]> = {
   "claude-code": [
     {
       id: "claude-sonnet-4-6",
+      planning: 7,
+      conversation: 8,
       strengths: ["frontend", "implementation", "reasoning", "debugging"],
       weaknesses: [],
     },
     {
       id: "claude-opus-4-6",
+      planning: 10,
+      conversation: 8,
       strengths: ["architecture", "refactoring", "complex reasoning", "system design"],
       weaknesses: [],
     },
   ],
   codex: [
-    { id: "o4-mini", strengths: ["unit tests", "test generation", "quick tasks"], weaknesses: [] },
-    { id: "o3", strengths: ["api design", "typescript", "reasoning", "backend"], weaknesses: [] },
+    { id: "o4-mini", planning: 4, conversation: 4, strengths: ["unit tests", "test generation", "quick tasks"], weaknesses: [] },
+    { id: "o3", planning: 8, conversation: 6, strengths: ["api design", "typescript", "reasoning", "backend"], weaknesses: [] },
   ],
   cursor: [
     {
       id: "composer-2",
+      planning: 3,
+      conversation: 4,
       strengths: ["react", "frontend", "jsx", "tsx", "ui", "portfolio", "graph", "visualization"],
       weaknesses: [],
     },
-    { id: "gpt-5.3-codex", strengths: ["implementation", "debugging", "backend"], weaknesses: [] },
+    { id: "gpt-5.3-codex", planning: 5, conversation: 5, strengths: ["implementation", "debugging", "backend"], weaknesses: [] },
   ],
   pi: [
     {
       id: "claude-sonnet-4-6",
+      planning: 7,
+      conversation: 7,
+      capabilities: ["native-tool-loop", "extensions"],
       strengths: ["implementation", "greenfield", "scaffolding", "full-stack"],
       weaknesses: [],
     },
-    { id: "gpt-4o", strengths: ["scripts", "automation", "cli", "shell"], weaknesses: [] },
-  ],
-  "gemini-cli": [
     {
-      id: "gemini-2.5-pro",
+      id: "gpt-4o",
+      planning: 4,
+      conversation: 6,
+      capabilities: ["native-tool-loop", "extensions"],
+      strengths: ["scripts", "automation", "cli", "shell"],
+      weaknesses: [],
+    },
+  ],
+  antigravity: [
+    {
+      id: "Gemini 3.1 Pro (High)",
+      planning: 9,
+      conversation: 8,
       strengths: ["long-context", "research", "multimodal", "reasoning", "large codebases"],
       weaknesses: [],
     },
     {
-      id: "gemini-2.5-flash",
+      id: "Claude Sonnet 4.6 (Thinking)",
+      planning: 8,
+      conversation: 8,
+      strengths: ["implementation", "reasoning", "debugging"],
+      weaknesses: [],
+    },
+    {
+      id: "Gemini 3.5 Flash (High)",
+      planning: 4,
+      conversation: 7,
       strengths: ["quick tasks", "summarization", "scripts"],
       weaknesses: [],
     },
@@ -62,6 +92,8 @@ export const DEFAULT_MODELS: Record<HarnessId, ModelCard[]> = {
 export const DEFAULT_CARDS: DefaultCard[] = [
   {
     id: "claude-code",
+    planning: 9,
+    conversation: 8,
     strengths: ["architecture", "refactoring", "complex reasoning", "system design", "debugging"],
     weaknesses: ["quick edits", "unit tests"],
     binaries: ["claude"],
@@ -69,6 +101,8 @@ export const DEFAULT_CARDS: DefaultCard[] = [
   },
   {
     id: "codex",
+    planning: 6,
+    conversation: 5,
     strengths: ["unit tests", "test generation", "api design", "typescript", "debugging"],
     weaknesses: ["ui work", "frontend styling"],
     binaries: ["codex"],
@@ -76,6 +110,8 @@ export const DEFAULT_CARDS: DefaultCard[] = [
   },
   {
     id: "cursor",
+    planning: 4,
+    conversation: 4,
     strengths: ["react", "frontend", "component fixes", "jsx", "tsx", "ui", "portfolio", "graph", "visualization"],
     weaknesses: ["long-running tasks", "deep architecture"],
     binaries: ["cursor-agent"],
@@ -83,17 +119,22 @@ export const DEFAULT_CARDS: DefaultCard[] = [
   },
   {
     id: "pi",
+    planning: 6,
+    conversation: 6,
+    capabilities: ["native-tool-loop", "extensions"],
     strengths: ["implementation", "greenfield", "scaffolding", "scripts", "automation", "cli", "full-stack"],
     weaknesses: ["complex refactors"],
     binaries: ["pi"],
     models: DEFAULT_MODELS.pi,
   },
   {
-    id: "gemini-cli",
+    id: "antigravity",
+    planning: 8,
+    conversation: 8,
     strengths: ["long-context", "research", "multimodal", "large codebases", "documentation"],
-    weaknesses: ["agentic editing"],
-    binaries: ["gemini"],
-    models: DEFAULT_MODELS["gemini-cli"],
+    weaknesses: ["unit tests"],
+    binaries: ["agy"],
+    models: DEFAULT_MODELS.antigravity,
   },
 ];
 
@@ -106,7 +147,7 @@ rules, Pi overlay). Edit \`relay/\`, never the generated output.
 
 export const DEFAULT_POLICY = {
   routing: [],
-  failover: ["pi", "cursor", "claude-code", "codex"],
+  failover: ["pi", "cursor", "claude-code", "codex", "antigravity"],
   governance: { requireGitSnapshotOnHandoff: true, maxHandoffTokens: 8000, maxTranscriptLines: 200 },
 };
 

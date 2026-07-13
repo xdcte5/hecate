@@ -1,0 +1,22 @@
+# Hecate benchmark spec — run with:  hecate bench fixtures/bench/example.yaml --workspace <seed-repo>
+# Each task runs twice: once as a single-agent baseline, once through Hecate's
+# multi-agent orchestration. Metrics are compared to prove savings.
+
+# Harness for the single-agent baseline (default: first failover harness).
+baseline: claude-code
+
+# Optional: USD per 1k output tokens; a `default` key turns on cost estimates.
+costPer1kTokens:
+  default: 0.015
+
+tasks:
+  - id: todo-api
+    goal: build a REST todo API with express and JWT auth
+    verify: npm test
+
+  - id: portfolio
+    goal: build a react portfolio page with a contact form and a projects grid
+
+  - id: fix-parser
+    goal: fix the off-by-one bug in the CSV parser and add a regression test
+    verify: npm test

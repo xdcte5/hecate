@@ -1,6 +1,6 @@
 import { detectInstalledBinaries } from "@relay/adapters";
 import type { HarnessId, Registry } from "@relay/schema";
-import readline from "node:readline";
+import type { ModalController, ModalStep } from "./modal.js";
 
 export type AgentScanResult = {
   id: HarnessId;
@@ -15,7 +15,7 @@ const HARNESS_LABEL: Record<HarnessId, string> = {
   codex: "Codex",
   cursor: "Cursor",
   pi: "Pi",
-  "gemini-cli": "Gemini",
+  "antigravity": "Antigravity",
 };
 
 export async function scanLocalAgents(
@@ -52,61 +52,70 @@ export function formatAgentScanList(scan: AgentScanResult[], enabled: HarnessId[
   });
 }
 
-export async function promptAgentSelection(
-  scan: AgentScanResult[],
-  current: HarnessId[],
-  output: NodeJS.WriteStream = process.stdout,
-  input: NodeJS.ReadStream = process.stdin,
-): Promise<HarnessId[]> {
-  const installed = scan.filter((a) => a.installed);
-  if (installed.length === 0) {
-    output.write("\nNo agent CLIs found on PATH. Install pi, claude, codex, or cursor-agent.\n");
-    return [];
+/**
+ * Modal for toggling which installed agents this session may use. Driven by the
+ * TUI's single readline — it never opens its own stdin reader. Toggling a number
+ * that is not installed reports why instead of silently doing nothing.
+ */
+export class AgentPickerModal implements ModalController<HarnessId[]> {
+  private enabled: Set<HarnessId>;
+  private readonly installed: AgentScanResult[];
+
+  constructor(
+    private readonly scan: AgentScanResult[],
+    current: HarnessId[],
+    private readonly write: (text: string) => void,
+  ) {
+    this.installed = scan.filter((a) => a.installed);
+    this.enabled = new Set(
+      current.length > 0
+        ? current.filter((id) => this.installed.some((a) => a.id === id))
+        : this.installed.map((a) => a.id),
+    );
   }
 
-  let enabled = new Set(
-    current.length > 0 ? current.filter((id) => installed.some((a) => a.id === id)) : installed.map((a) => a.id),
-  );
+  /** No agents on PATH — nothing to toggle. */
+  get hasInstalledAgents(): boolean {
+    return this.installed.length > 0;
+  }
 
-  const render = () => {
-    output.write("\nSelect agents for this session (toggle numbers, Enter to confirm):\n");
-    for (const line of formatAgentScanList(scan, [...enabled])) {
-      output.write(`${line}\n`);
+  render(): void {
+    this.write("\nSelect agents for this session (toggle numbers, Enter to confirm):\n");
+    for (const line of formatAgentScanList(this.scan, [...this.enabled])) {
+      this.write(`${line}\n`);
     }
-    output.write("Toggle (e.g. 1 3) or Enter to save: ");
-  };
+    this.write("Toggle (e.g. 1 3) or Enter to save: ");
+  }
 
-  return new Promise((resolve) => {
-    const rl = readline.createInterface({ input, output, terminal: true });
-    render();
+  handleLine(line: string): ModalStep<HarnessId[]> {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      return { done: true, result: [...this.enabled] };
+    }
 
-    rl.on("line", (line) => {
-      const trimmed = line.trim();
-      if (!trimmed) {
-        rl.close();
-        resolve([...enabled]);
-        return;
+    for (const token of trimmed.split(/\s+/)) {
+      const num = Number.parseInt(token, 10);
+      if (!Number.isFinite(num) || num < 1 || num > this.scan.length) {
+        this.write(`  "${token}" is not one of the listed numbers.\n`);
+        continue;
       }
-
-      for (const token of trimmed.split(/\s+/)) {
-        const num = Number.parseInt(token, 10);
-        if (!Number.isFinite(num) || num < 1 || num > scan.length) continue;
-        const agent = scan[num - 1]!;
-        if (!agent.installed) continue;
-        if (enabled.has(agent.id)) enabled.delete(agent.id);
-        else enabled.add(agent.id);
+      const agent = this.scan[num - 1]!;
+      if (!agent.installed) {
+        this.write(
+          `  ${agent.label} is not installed (${agent.binaries.join("|")} not on PATH) — install it to enable.\n`,
+        );
+        continue;
       }
+      if (this.enabled.has(agent.id)) this.enabled.delete(agent.id);
+      else this.enabled.add(agent.id);
+    }
 
-      if (enabled.size === 0) {
-        output.write("At least one installed agent must stay enabled.\n");
-        enabled = new Set(installed.map((a) => a.id));
-      }
+    if (this.enabled.size === 0) {
+      this.write("  At least one installed agent must stay enabled.\n");
+      this.enabled = new Set(this.installed.map((a) => a.id));
+    }
 
-      render();
-    });
-
-    rl.on("close", () => {
-      resolve([...enabled]);
-    });
-  });
+    this.render();
+    return { done: false };
+  }
 }

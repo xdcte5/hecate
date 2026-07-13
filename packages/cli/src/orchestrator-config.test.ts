@@ -35,7 +35,7 @@ describe("orchestrator config", () => {
         "verify:",
         "  enabled: false",
         "login:",
-        "  gemini-cli: [auth, login]",
+        "  antigravity: [auth, login]",
         "",
       ].join("\n"),
     );
@@ -44,7 +44,7 @@ describe("orchestrator config", () => {
     expect(config.routing?.implement).toBe("pi");
     expect(config.models?.["claude-code"]).toBe("claude-opus-4-6");
     expect(config.verify?.enabled).toBe(false);
-    expect(config.login?.["gemini-cli"]).toEqual(["auth", "login"]);
+    expect(config.login?.["antigravity"]).toEqual(["auth", "login"]);
   });
 
   it("rejects an unknown harness id in routing", async () => {

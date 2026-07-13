@@ -72,8 +72,8 @@ export class PiRpcDriver implements HarnessDriver {
       const child: ChildProcess = spawn(
         request.binary,
         request.model
-          ? ["--mode", "rpc", "--approve", "--model", request.model]
-          : ["--mode", "rpc", "--approve"],
+          ? ["--mode", "rpc", "--no-session", "--model", request.model]
+          : ["--mode", "rpc", "--no-session"],
         {
           cwd: request.cwd,
           stdio: ["pipe", "pipe", "pipe"],

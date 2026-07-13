@@ -8,7 +8,7 @@ import { ClaudeAdapter } from "./claude.js";
 import { CodexAdapter } from "./codex.js";
 import { CursorAdapter } from "./cursor.js";
 import { PiAdapter } from "./pi.js";
-import { GeminiAdapter } from "./gemini.js";
+import { AntigravityAdapter } from "./antigravity.js";
 import { readRelaySource } from "./source.js";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
@@ -21,7 +21,7 @@ const adapters: Record<string, Adapter> = {
   codex: new CodexAdapter(),
   cursor: new CursorAdapter(),
   pi: new PiAdapter(),
-  gemini: new GeminiAdapter(),
+  antigravity: new AntigravityAdapter(),
 };
 
 function walkGolden(dir: string): string[] {
@@ -77,7 +77,7 @@ describe("golden adapter output", () => {
 describe("adapter harness ids", () => {
   it("declare their harness", () => {
     const ids: HarnessId[] = Object.values(adapters).map((a) => a.harness);
-    expect(ids).toEqual(["claude-code", "codex", "cursor", "pi", "gemini-cli"]);
+    expect(ids).toEqual(["claude-code", "codex", "cursor", "pi", "antigravity"]);
   });
 });
 

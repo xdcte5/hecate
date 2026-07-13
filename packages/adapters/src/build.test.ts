@@ -27,18 +27,11 @@ describe("buildProject", () => {
     const root = scaffold();
     const result = await buildProject(root);
 
-    expect(Object.keys(result.filesByHarness).sort()).toEqual([
-      "claude-code",
-      "codex",
-      "cursor",
-      "gemini-cli",
-      "pi",
-    ]);
+    expect(Object.keys(result.filesByHarness).sort()).toEqual(["antigravity", "claude-code", "codex", "cursor", "pi"]);
     expect(() => RelayLockSchema.parse(result.lock)).not.toThrow();
     expect(existsSync(join(root, "CLAUDE.md"))).toBe(true);
     expect(existsSync(join(root, "AGENTS.md"))).toBe(true);
     expect(existsSync(join(root, ".cursor/rules/main.mdc"))).toBe(true);
-    expect(existsSync(join(root, "GEMINI.md"))).toBe(true);
     expect(existsSync(join(root, "relay.lock"))).toBe(true);
   });
 

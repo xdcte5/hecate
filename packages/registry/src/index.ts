@@ -27,3 +27,22 @@ export {
   type RouteModelReason,
   type RouteModelResult,
 } from "./model-router.js";
+
+export {
+  assignStep,
+  assignModel,
+  capabilityScore,
+  CAPABILITY_KEYWORDS,
+  SPECIAL_CAPABILITIES,
+  type StepAssignment,
+  type StepAssignmentReason,
+  type AssignStepInput,
+} from "./capability-router.js";
+
+export {
+  rankPlanners,
+  selectPrimaryPlanner,
+  rankConversationalists,
+  selectConversationalist,
+  type AbilityChoice,
+} from "./planner-rank.js";

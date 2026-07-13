@@ -13,7 +13,7 @@ describe("renderFooter", () => {
       width: 100,
     });
 
-    expect(line).toContain("relay");
+    expect(line).toContain("hecate");
     expect(line).toContain("Pi");
     expect(line).toContain("claude-sonnet-4-6");
     expect(line).toContain("2/3");

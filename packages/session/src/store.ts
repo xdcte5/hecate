@@ -10,6 +10,7 @@ import {
   activeSessionPath,
   handoffMdPath,
   handoffPath,
+  sessionDir,
   sessionPath,
   sessionsRoot,
 } from "./paths.js";
@@ -148,6 +149,21 @@ export class SessionStore {
     if (!parent?.childIds?.length) return [];
     const children = await Promise.all(parent.childIds.map((id) => this.get(id)));
     return children.filter((c): c is RhpV1 => c !== null);
+  }
+
+  /**
+   * Delete a session's on-disk directory (events, handoff, run-state). Used to
+   * tear down ephemeral sessions when the interactive harness quits. Clears the
+   * active pointer if it still points at the purged session.
+   */
+  async purge(id: string): Promise<void> {
+    await fs.rm(sessionDir(this.rootDir, id), { recursive: true, force: true });
+    try {
+      const activeId = (await fs.readFile(activeSessionPath(this.rootDir), "utf8")).trim();
+      if (activeId === id) await fs.rm(activeSessionPath(this.rootDir), { force: true });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
   }
 
   async getActive(): Promise<RhpV1 | null> {

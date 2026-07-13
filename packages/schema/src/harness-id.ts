@@ -5,6 +5,6 @@ export const HarnessIdSchema = z.enum([
   "codex",
   "cursor",
   "pi",
-  "gemini-cli",
+  "antigravity",
 ]);
 export type HarnessId = z.infer<typeof HarnessIdSchema>;

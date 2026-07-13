@@ -20,7 +20,7 @@ const HARNESS_LABEL: Record<HarnessId, string> = {
   codex: "Codex",
   cursor: "Cursor",
   pi: "Pi",
-  "gemini-cli": "Gemini",
+  "antigravity": "Antigravity",
 };
 
 function harnessColor(id: HarnessId | undefined): string {
@@ -68,7 +68,7 @@ export function renderFooter(state: FooterState): string {
       : `${ANSI.dim}idle${ANSI.reset}`;
 
   const cwd = basename(state.cwd);
-  const left = `${ANSI.bgBlue}${ANSI.bold}${ANSI.white} relay ${ANSI.reset}`;
+  const left = `${ANSI.bgBlue}${ANSI.bold}${ANSI.white} hecate ${ANSI.reset}`;
   const segments = [
     `${ANSI.dim}harness${ANSI.reset} ${harnessStyled}`,
     `${ANSI.dim}model${ANSI.reset} ${model}`,
@@ -77,7 +77,7 @@ export function renderFooter(state: FooterState): string {
   ];
   const body = segments.join(` ${ANSI.dim}·${ANSI.reset} `);
   const plainLen =
-    7 +
+    8 +
     (harness ? harnessText.length : 1) +
     (state.modelMode === "auto" || !state.model ? 4 : (state.model?.length ?? 4)) +
     (state.step !== undefined ? 8 : 4) +

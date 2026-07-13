@@ -30,8 +30,14 @@ describe("auth state", () => {
   });
 
   it("has default login args for every harness", () => {
-    for (const id of ["claude-code", "codex", "cursor", "pi", "gemini-cli"] as const) {
+    for (const id of ["claude-code", "codex", "cursor", "pi", "antigravity"] as const) {
+      expect(DEFAULT_LOGIN_ARGS[id]).toBeDefined();
+    }
+    // CLIs with a dedicated login/auth subcommand.
+    for (const id of ["claude-code", "codex", "cursor", "pi"] as const) {
       expect(DEFAULT_LOGIN_ARGS[id].length).toBeGreaterThan(0);
     }
+    // Antigravity signs in via its bare interactive launch — no login subcommand.
+    expect(DEFAULT_LOGIN_ARGS.antigravity).toEqual([]);
   });
 });

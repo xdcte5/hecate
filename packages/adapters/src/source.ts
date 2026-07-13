@@ -42,7 +42,7 @@ const HARNESS_INSTRUCTION_FILES: Record<string, HarnessId> = {
   "instructions.codex.md": "codex",
   "instructions.cursor.md": "cursor",
   "instructions.pi.md": "pi",
-  "instructions.gemini.md": "gemini-cli",
+  "instructions.antigravity.md": "antigravity",
 };
 
 async function readIfExists(path: string): Promise<string | null> {
