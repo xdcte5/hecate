@@ -2,6 +2,8 @@
 # Optional overrides — leave empty to route from strengths/weaknesses + task analysis.
 routing: []
 
+# Failover order breaks ability-score ties (first match wins).
+# Pi is first so implement steps prefer Pi when harnesses score equally.
 failover:
   - pi
   - cursor

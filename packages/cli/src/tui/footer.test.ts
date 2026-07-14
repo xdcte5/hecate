@@ -31,4 +31,17 @@ describe("renderFooter", () => {
     expect(line).toContain("auto");
     expect(line).toContain("idle");
   });
+
+  it("includes git branch and context percent when provided", () => {
+    const line = renderFooter({
+      cwd: "/tmp/proj",
+      harness: "pi",
+      gitBranch: "feat/tui",
+      contextPct: 42,
+      width: 100,
+    });
+
+    expect(line).toContain("feat/tui");
+    expect(line).toContain("42%");
+  });
 });

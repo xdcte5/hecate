@@ -1,4 +1,4 @@
-import type { HarnessId } from "@relay/schema";
+import type { HarnessId, HarnessResult } from "@relay/schema";
 import type { RouteModelReason, SelectHarnessReason } from "@relay/registry";
 
 export type RunStepStatus = "pending" | "running" | "done" | "failed" | "skipped" | "manual";
@@ -16,6 +16,7 @@ export type RunStep = {
   startedAt?: string;
   finishedAt?: string;
   error?: string;
+  result?: Partial<HarnessResult>;
 };
 
 export type RunState = {

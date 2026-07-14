@@ -86,6 +86,42 @@ describe("routeModel", () => {
     });
   });
 
+  it("picks an OpenAI Pi model when only openai is authenticated", () => {
+    expect(
+      routeModel("build a thrift shopping website", "pi", registry, {
+        piAuthProviders: new Set(["openai"]),
+      }),
+    ).toMatchObject({
+      modelId: "gpt-4o",
+      reason: "auth-match",
+    });
+  });
+
+  it("keeps ability routing within authenticated Pi providers", () => {
+    expect(
+      routeModel("create shell script for nightly backups", "pi", registry, {
+        piAuthProviders: new Set(["openai", "anthropic"]),
+      }),
+    ).toMatchObject({
+      modelId: "gpt-4o",
+      reason: "ability-match",
+    });
+  });
+
+  it("uses pi --list-models entries when provided", () => {
+    expect(
+      routeModel("build a thrift shopping website", "pi", registry, {
+        piListedModels: [
+          { provider: "openai-codex", modelId: "gpt-5.4", spec: "openai-codex/gpt-5.4" },
+          { provider: "groq", modelId: "llama-3.1-8b-instant", spec: "groq/llama-3.1-8b-instant" },
+        ],
+      }),
+    ).toMatchObject({
+      modelId: "openai-codex/gpt-5.4",
+      reason: "auth-match",
+    });
+  });
+
   it("returns undefined when harness has no models configured", () => {
     const bare: Registry = {
       harnesses: [

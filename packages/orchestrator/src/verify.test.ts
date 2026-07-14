@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadRelayConfig, ThinRouter } from "@relay/registry";
 import { buildRunPlan } from "./plan.js";
-import { listChangedFiles, verifyImplementWave } from "./verify.js";
+import { listChangedFiles, resolveTestCommand, runTestGate, verifyImplementWave } from "./verify.js";
 
 const fixtureRoot = join(import.meta.dirname, "../../../fixtures/minimal-relay");
 
@@ -50,7 +50,58 @@ describe("verifyImplementWave", () => {
     const files = await listChangedFiles(dir);
     expect(files.length).toBeGreaterThan(0);
 
-    const result = await verifyImplementWave(dir);
+    const result = await verifyImplementWave(dir, { testCommand: null });
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("resolveTestCommand", () => {
+  it("prefers explicit override and env", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "relay-verify-"));
+    expect(await resolveTestCommand(dir, { testCommand: "npm test" })).toBe("npm test");
+
+    const prev = process.env.RELAY_VERIFY_TEST_COMMAND;
+    process.env.RELAY_VERIFY_TEST_COMMAND = "pnpm vitest run";
+    expect(await resolveTestCommand(dir)).toBe("pnpm vitest run");
+    if (prev === undefined) delete process.env.RELAY_VERIFY_TEST_COMMAND;
+    else process.env.RELAY_VERIFY_TEST_COMMAND = prev;
+  });
+
+  it("auto-detects pnpm test from package.json", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "relay-verify-"));
+    await writeFile(
+      join(dir, "package.json"),
+      JSON.stringify({ scripts: { test: "vitest run" } }),
+    );
+    expect(await resolveTestCommand(dir, { testCommand: undefined })).toBe("pnpm test");
+  });
+
+  it("respects session policy disable flag", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "relay-verify-"));
+    await writeFile(
+      join(dir, "package.json"),
+      JSON.stringify({ scripts: { test: "vitest run" } }),
+    );
+    expect(
+      await resolveTestCommand(dir, {
+        sessionPolicy: { routing: [], failover: ["pi"], verification: { enableTestGate: false } },
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("runTestGate", () => {
+  it("runs a shell command in cwd", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "relay-verify-"));
+    const result = await runTestGate(dir, "echo ok");
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain("Tests passed");
+  });
+
+  it("reports failure for non-zero exit", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "relay-verify-"));
+    const result = await runTestGate(dir, "exit 1");
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("Test gate failed");
   });
 });

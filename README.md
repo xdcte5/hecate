@@ -52,9 +52,27 @@ Type natural language — Relay plans steps and runs agents automatically (Claud
 
 ```bash
 relay chat                     # same as bare `relay`
-relay dash                     # power-user dashboard (optional)
+relay dash                     # deprecated — use `relay` chat mode
 relay run <goal> [--launch]    # low-level orchestration (optional)
 ```
+
+### Fusion demo (Pi × Relay)
+
+One natural-language prompt plans and runs the full mesh automatically — no manual
+`handoff`, `next`, or `done`:
+
+```bash
+cd fixtures/minimal-relay   # or your own project after relay init
+relay
+# you › add a login page with form validation
+# → Plan: Pi implement → optional test wave
+# → Live tool events stream in the TUI
+```
+
+Skills in `relay/skills/` load into Pi RPC sessions; see [docs/skills-bridge.md](docs/skills-bridge.md).
+
+CI uses `RELAY_MOCK_DRIVER=1` and the mock harness driver — see
+`fixtures/minimal-relay/e2e/fusion.test.ts`.
 
 ```bash
 pnpm install

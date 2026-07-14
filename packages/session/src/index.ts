@@ -11,7 +11,7 @@ export {
 } from "./brownfield-kpi.js";
 export { mergeRhpPatch, type RhpV1Patch } from "./_vendor/ide-bridge/merge.js";
 export { captureGitSnapshot, type GitSnapshotOptions } from "./git-snapshot.js";
-export { buildHandoffBundle, buildHandoffArtifacts, type HandoffArtifacts } from "./rhp-builder.js";
+export { buildHandoffBundle, buildHandoffArtifacts, enforceMaxHandoffTokens, estimateHandoffTokens, type HandoffArtifacts } from "./rhp-builder.js";
 export { renderHandoffMarkdown } from "./render-handoff.js";
 export { loadRelayConfig, saveRelayConfig, setActiveSessionId } from "./relay-config.js";
 export { RELAY_CONFIG_RELATIVE_PATH } from "./relay-config-path.js";

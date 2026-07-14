@@ -33,11 +33,14 @@ export {
 export {
   RoutingRuleSchema,
   SessionPolicyGovernanceSchema,
+  SessionPolicyVerificationSchema,
   SessionPolicySchema,
   resolveSessionPolicyGovernance,
+  resolveSessionPolicyVerification,
   type RoutingRule,
   type SessionPolicy,
   type SessionPolicyGovernance,
+  type SessionPolicyVerification,
 } from "./session-policy.js";
 
 export {
@@ -61,3 +64,39 @@ export {
   type AdapterManifest,
   type RelayLock,
 } from "./adapter-manifest.js";
+
+export {
+  HarnessResultSchema,
+  type HarnessResult,
+} from "./harness-result.js";
+
+export {
+  PlanStepEventSchema,
+  StepStartEventSchema,
+  StepEndEventSchema,
+  ToolStartEventSchema,
+  ToolEndEventSchema,
+  AgentMessageEventSchema,
+  PlanEventSchema,
+  ErrorEventSchema,
+  AgentStartEventSchema,
+  AgentEndEventSchema,
+  HandoffEventSchema,
+  RetryStartEventSchema,
+  RetryEndEventSchema,
+  HarnessEventSchema,
+  type PlanStepEvent,
+  type StepStartEvent,
+  type StepEndEvent,
+  type ToolStartEvent,
+  type ToolEndEvent,
+  type AgentMessageEvent,
+  type PlanEvent,
+  type ErrorEvent,
+  type AgentStartEvent,
+  type AgentEndEvent,
+  type HandoffEvent,
+  type RetryStartEvent,
+  type RetryEndEvent,
+  type HarnessEvent,
+} from "./harness-event.js";

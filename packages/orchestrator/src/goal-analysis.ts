@@ -17,8 +17,9 @@ const BUILD_WORDS = /\b(build|create|add|implement|make|design|scaffold|setup|se
 
 const FRONTEND_WORDS =
   /\b(page|ui|frontend|component|button|screen|view|layout|css|tailwind|react|vue|website|site|portfolio|graph|chart|visualization|social|landing|navbar|hero)\b/i;
+const AUTH_WORDS = /\b(auth|authentication|oauth|jwt|session management)\b/i;
 const BACKEND_WORDS =
-  /\b(api|backend|auth|server|database|endpoint|route|middleware|jwt|session|oauth|graphql|postgres|mysql)\b/i;
+  /\b(api|backend|server|database|endpoint|route|middleware|jwt|session|oauth|graphql|postgres|mysql)\b/i;
 
 /** Classify a natural-language goal — drives which steps exist, not which agent runs them. */
 export function analyzeGoal(goal: string): GoalAnalysis {
@@ -44,7 +45,7 @@ export function analyzeGoal(goal: string): GoalAnalysis {
     mode,
     layers: {
       frontend: FRONTEND_WORDS.test(trimmed),
-      backend: BACKEND_WORDS.test(trimmed),
+      backend: BACKEND_WORDS.test(trimmed) || AUTH_WORDS.test(trimmed),
     },
     wantsTests,
     wantsReview: wantsReview || isRefactor,

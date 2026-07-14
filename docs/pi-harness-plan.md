@@ -1,5 +1,7 @@
 # Relay → Pi-Like Harness Plan
 
+> **Sprint plan:** [sprint-plan-pi-relay-fusion.md](./sprint-plan-pi-relay-fusion.md) — 8-week implementation schedule with day-by-day Sprint 1 detail.
+
 > Goal: **Launch `relay` once, type normal English prompts, Relay plans + runs agents automatically** — with a Pi-quality TUI and real tool-loop execution, while keeping Relay’s unique multi-agent mesh (Claude / Codex / Cursor / Pi routing).
 
 **Reference:** [earendil-works/pi — `packages/coding-agent`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent)  

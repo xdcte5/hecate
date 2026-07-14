@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { basename } from "node:path";
 import type { HarnessId } from "@relay/schema";
 import type { ModelMode } from "./local-config.js";
@@ -43,10 +44,25 @@ export type FooterState = {
   modelMode?: ModelMode;
   step?: number;
   totalSteps?: number;
+  contextPct?: number;
+  gitBranch?: string;
   cwd: string;
   goal?: string;
   width?: number;
 };
+
+export function detectGitBranch(cwd: string): string | undefined {
+  try {
+    const branch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    return branch && branch !== "HEAD" ? branch : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export function renderFooter(state: FooterState): string {
   const w = Math.max(60, Math.min(state.width ?? process.stdout.columns ?? 80, 120));
@@ -66,13 +82,24 @@ export function renderFooter(state: FooterState): string {
       ? `${ANSI.dim}step${ANSI.reset} ${state.step}/${state.totalSteps}`
       : `${ANSI.dim}idle${ANSI.reset}`;
 
+  const ctxText =
+    state.contextPct !== undefined
+      ? `${ANSI.dim}ctx${ANSI.reset} ${state.contextPct}%`
+      : null;
+
   const cwd = basename(state.cwd);
+  const branch = state.gitBranch;
+  const pathText = branch
+    ? `${ANSI.gray}${branch}${ANSI.dim}:${ANSI.reset}${ANSI.gray}${cwd}${ANSI.reset}`
+    : `${ANSI.gray}${cwd}${ANSI.reset}`;
+
   const left = `${ANSI.bgBlue}${ANSI.bold}${ANSI.white} relay ${ANSI.reset}`;
   const segments = [
     `${ANSI.dim}harness${ANSI.reset} ${harnessStyled}`,
     `${ANSI.dim}model${ANSI.reset} ${model}`,
     stepText,
-    `${ANSI.dim}cwd${ANSI.reset} ${ANSI.gray}${cwd}${ANSI.reset}`,
+    ...(ctxText ? [ctxText] : []),
+    `${ANSI.dim}cwd${ANSI.reset} ${pathText}`,
   ];
   const body = segments.join(` ${ANSI.dim}·${ANSI.reset} `);
   const plainLen =
@@ -80,8 +107,10 @@ export function renderFooter(state: FooterState): string {
     (harness ? harnessText.length : 1) +
     (state.modelMode === "auto" || !state.model ? 4 : (state.model?.length ?? 4)) +
     (state.step !== undefined ? 8 : 4) +
+    (state.contextPct !== undefined ? 8 : 0) +
     cwd.length +
-    20;
+    (branch ? branch.length + 1 : 0) +
+    24;
   const padLen = Math.max(0, w - plainLen);
   return `${left} ${body}${" ".repeat(padLen)}`;
 }

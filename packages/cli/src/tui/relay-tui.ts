@@ -1,10 +1,11 @@
 import readline from "node:readline";
 import { loadRelayConfig } from "@relay/registry";
-import { getPromptStatus, processPrompt } from "@relay/orchestrator";
-import type { HarnessId } from "@relay/schema";
+import { syncEnabledAgentsWithInstalled } from "@relay/orchestrator";
+import { getPromptStatus, processPrompt, createSteerQueue } from "@relay/orchestrator";
+import type { HarnessEvent, HarnessId, ToolEndEvent } from "@relay/schema";
 import { SessionStore } from "@relay/session";
 import { scanLocalAgents, promptAgentSelection } from "./agent-picker.js";
-import { renderFooter, type FooterState } from "./footer.js";
+import { detectGitBranch, renderFooter, type FooterState } from "./footer.js";
 import {
   readLocalConfig,
   writeLocalConfig,
@@ -12,10 +13,22 @@ import {
   type LocalConfig,
 } from "./local-config.js";
 import { discoverHarnessModels, formatModelChoices, promptModelSelection } from "./model-picker.js";
+import { createTuiInputState, queueSteerMessage } from "./tui-handlers.js";
 import {
-  formatRelayBanner,
+  formatHarnessOverrideAck,
+  formatModelOverrideAck,
+} from "./input.js";
+import { autoScrollOffset, computeLayoutRegions, renderLayout } from "./layout.js";
+import { AltScreen } from "./screen.js";
+import {
+  createTranscriptContext,
+  findLatestToggleableToolKey,
   formatTranscriptEntry,
   parseOrchestratorLine,
+  renderHarnessEvent,
+  renderToolEndLines,
+  toggleTranscriptToolExpand,
+  type TranscriptRenderContext,
 } from "./transcript.js";
 
 const ANSI = {
@@ -26,6 +39,8 @@ const ANSI = {
   yellow: "\x1b[33m",
 };
 
+const INPUT_PROMPT = `${ANSI.dim}you${ANSI.reset} ${ANSI.bold}›${ANSI.reset} `;
+
 type RelayTuiOptions = {
   cwd: string;
 };
@@ -35,14 +50,31 @@ type RuntimeState = {
   harness?: HarnessId;
   step?: number;
   totalSteps?: number;
+  contextPct?: number;
 };
+
+/**
+ * TUI library choice: `@earendil-works/pi-tui@0.80.6` requires Node >=22.19.0,
+ * which excludes Node 20 and older Node 22. Relay uses a custom ANSI alt-screen
+ * shell in screen.ts / layout.ts until pi-tui engine range widens.
+ */
 
 export async function runRelayTui(options: RelayTuiOptions): Promise<void> {
   const { cwd } = options;
   let localConfig = await readLocalConfig(cwd);
-  const { registry } = await loadRelayConfig(cwd);
+  const { registry, sessionPolicy } = await loadRelayConfig(cwd);
 
-  const scan = await scanLocalAgents(registry);
+  let scan = await scanLocalAgents(registry);
+  const syncedEnabled = syncEnabledAgentsWithInstalled(
+    localConfig.enabledAgents,
+    scan.filter((a) => a.installed).map((a) => a.id),
+    sessionPolicy.failover,
+  );
+  if (JSON.stringify(syncedEnabled) !== JSON.stringify(localConfig.enabledAgents)) {
+    localConfig.enabledAgents = syncedEnabled;
+    await writeLocalConfig(cwd, localConfig);
+  }
+
   if (localConfig.enabledAgents.length === 0) {
     const installed = scan.filter((a) => a.installed);
     if (installed.length > 0) {
@@ -58,7 +90,24 @@ export async function runRelayTui(options: RelayTuiOptions): Promise<void> {
   const session = await new SessionStore({ rootDir: cwd }).getActive();
   runtime.goal = session?.goal;
 
-  const paintFooter = () => {
+  const transcriptLines: string[] = [];
+  let transcriptContext: TranscriptRenderContext = createTranscriptContext();
+  type ToolBlockSpan = { key: string; start: number; end: number; event: ToolEndEvent };
+  const toolBlockSpans: ToolBlockSpan[] = [];
+  let scrollOffset = 0;
+  let stickToBottom = true;
+  let statusLine: string | undefined;
+  const gitBranch = detectGitBranch(cwd);
+
+  const screen = new AltScreen({
+    onResize: () => {
+      repaint();
+    },
+  });
+
+  let rl: readline.Interface;
+
+  const buildFooterLine = (): string => {
     const footer: FooterState = {
       cwd,
       goal: runtime.goal,
@@ -67,45 +116,152 @@ export async function runRelayTui(options: RelayTuiOptions): Promise<void> {
       modelMode: localConfig.modelMode,
       step: runtime.step,
       totalSteps: runtime.totalSteps,
-      width: process.stdout.columns,
+      contextPct: runtime.contextPct,
+      gitBranch,
+      width: screen.size.cols,
     };
-    process.stdout.write(`${renderFooter(footer)}\n`);
+    return renderFooter(footer);
   };
 
-  process.stdout.write(`\n${formatRelayBanner(runtime.goal)}\n\n`);
-  paintFooter();
-  process.stdout.write("\n");
+  const repaint = () => {
+    const { cols, rows } = screen.size;
+    const regions = computeLayoutRegions(rows);
+    scrollOffset = autoScrollOffset(
+      transcriptLines.length,
+      regions.transcriptRows,
+      scrollOffset,
+      stickToBottom,
+    );
 
-  const rl = readline.createInterface({
+    const frame = renderLayout({
+      goal: runtime.goal,
+      transcriptLines,
+      footerLine: buildFooterLine(),
+      inputPrompt: INPUT_PROMPT,
+      statusLine,
+      scrollOffset,
+      width: cols,
+      height: rows,
+    });
+
+    rl.pause();
+    screen.paint(frame);
+    screen.setCursorVisible(true);
+    rl.resume();
+    rl.prompt(true);
+  };
+
+  screen.enter();
+
+  rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
     terminal: true,
-    prompt: `${ANSI.dim}you${ANSI.reset} ${ANSI.bold}›${ANSI.reset} `,
+    prompt: INPUT_PROMPT,
   });
+
+  readline.emitKeypressEvents(process.stdin, rl);
+  process.stdin.on("keypress", (_str, key) => {
+    if (!key) return;
+    if (key.ctrl && key.name === "o") {
+      toggleFocusedToolBlock();
+      return;
+    }
+    if (key.name === "o" && !key.ctrl && !busy && rl.line.length === 0) {
+      toggleFocusedToolBlock();
+    }
+  });
+
+  repaint();
 
   let busy = false;
   let abortController: AbortController | null = null;
   let interruptCount = 0;
   let interruptTimer: ReturnType<typeof setTimeout> | null = null;
+  const steerQueue = createSteerQueue();
+  const inputState = createTuiInputState();
 
-  const emit = (text: string) => {
-    readline.clearLine(process.stdout, 0);
-    readline.cursorTo(process.stdout, 0);
+  const appendTranscript = (lines: string[]) => {
+    if (lines.length === 0) return;
+    transcriptLines.push(...lines);
+    stickToBottom = true;
+    repaint();
+  };
+
+  const emitLine = (text: string) => {
     const entry = parseOrchestratorLine(text);
-    process.stdout.write(`${formatTranscriptEntry(entry)}\n`);
+    appendTranscript([formatTranscriptEntry(entry)]);
     updateRuntimeFromLine(text, runtime);
+    repaint();
+  };
+
+  const emitEvent = (event: HarnessEvent) => {
+    const startIdx = transcriptLines.length;
+    const rendered = renderHarnessEvent(event, transcriptContext);
+    transcriptContext = rendered.context;
+    if (rendered.lines.length > 0) {
+      appendTranscript(rendered.lines);
+    }
+    if (event.type === "tool_end") {
+      toolBlockSpans.push({
+        key: event.toolCallId ?? event.toolName,
+        start: startIdx,
+        end: transcriptLines.length,
+        event,
+      });
+    }
+    updateRuntimeFromEvent(event, runtime);
+    repaint();
+  };
+
+  const toggleFocusedToolBlock = () => {
+    const toolKey = findLatestToggleableToolKey(transcriptContext);
+    if (!toolKey) {
+      statusLine = `${ANSI.dim}No tool block to expand — Ctrl+O after a tool finishes${ANSI.reset}`;
+      repaint();
+      return;
+    }
+
+    let spanIndex = -1;
+    for (let i = toolBlockSpans.length - 1; i >= 0; i--) {
+      if (toolBlockSpans[i]!.key === toolKey) {
+        spanIndex = i;
+        break;
+      }
+    }
+    const span = spanIndex >= 0 ? toolBlockSpans[spanIndex] : undefined;
+    if (!span) {
+      statusLine = `${ANSI.dim}No tool block to expand${ANSI.reset}`;
+      repaint();
+      return;
+    }
+
+    transcriptContext = toggleTranscriptToolExpand(transcriptContext, toolKey);
+    const newLines = renderToolEndLines(span.event, transcriptContext);
+    const oldCount = span.end - span.start;
+    transcriptLines.splice(span.start, oldCount, ...newLines);
+    span.end = span.start + newLines.length;
+
+    const delta = newLines.length - oldCount;
+    for (let i = spanIndex + 1; i < toolBlockSpans.length; i++) {
+      toolBlockSpans[i]!.start += delta;
+      toolBlockSpans[i]!.end += delta;
+    }
+
+    statusLine = undefined;
+    stickToBottom = true;
+    repaint();
   };
 
   const say = (text: string) => {
-    readline.clearLine(process.stdout, 0);
-    readline.cursorTo(process.stdout, 0);
-    process.stdout.write(`${ANSI.dim}relay${ANSI.reset} ${ANSI.bold}›${ANSI.reset} ${text}\n`);
+    appendTranscript([
+      `${ANSI.dim}relay${ANSI.reset} ${ANSI.bold}›${ANSI.reset} ${text}`,
+    ]);
   };
 
   const showStatus = async () => {
     const rows = await getPromptStatus(cwd);
-    for (const row of rows) emit(row);
-    paintFooter();
+    for (const row of rows) emitLine(row);
   };
 
   const showConfig = () => {
@@ -113,16 +269,16 @@ export async function runRelayTui(options: RelayTuiOptions): Promise<void> {
   };
 
   const runAgentsPicker = async () => {
-    rl.pause();
+    screen.exit();
     localConfig.enabledAgents = await promptAgentSelection(scan, localConfig.enabledAgents);
     await writeLocalConfig(cwd, localConfig);
+    screen.enter();
     say(`Enabled: ${localConfig.enabledAgents.join(", ") || "(none)"}`);
-    rl.resume();
     rl.prompt();
   };
 
   const runModelsPicker = async () => {
-    rl.pause();
+    screen.exit();
     const enabled = localConfig.enabledAgents.length
       ? localConfig.enabledAgents
       : scan.filter((a) => a.installed).map((a) => a.id);
@@ -139,13 +295,15 @@ export async function runRelayTui(options: RelayTuiOptions): Promise<void> {
       });
     }
 
-    for (const line of formatModelChoices(choices)) say(line);
+    for (const line of formatModelChoices(choices)) {
+      process.stdout.write(`${line}\n`);
+    }
     const overrides = await promptModelSelection(choices);
     localConfig.modelOverrides = { ...localConfig.modelOverrides, ...overrides };
     localConfig.modelMode = Object.keys(localConfig.modelOverrides).length > 0 ? "manual" : "auto";
     await writeLocalConfig(cwd, localConfig);
+    screen.enter();
     say(`Model mode: ${localConfig.modelMode}`);
-    rl.resume();
     rl.prompt();
   };
 
@@ -158,16 +316,16 @@ export async function runRelayTui(options: RelayTuiOptions): Promise<void> {
   const cleanup = () => {
     abortController?.abort();
     rl.close();
+    screen.exit();
     process.stdout.write(ANSI.reset);
   };
 
   const resetBusy = () => {
     busy = false;
     abortController = null;
+    statusLine = undefined;
     rl.resume();
-    paintFooter();
-    process.stdout.write("\n");
-    rl.prompt();
+    repaint();
   };
 
   rl.on("SIGINT", () => {
@@ -178,8 +336,8 @@ export async function runRelayTui(options: RelayTuiOptions): Promise<void> {
     }, 2000);
 
     if (busy && interruptCount === 1) {
-      say(`${ANSI.yellow}Working… status · agents · models · Ctrl+C twice to cancel${ANSI.reset}`);
-      rl.prompt();
+      statusLine = `${ANSI.yellow}Working… /status · /steer · /harness · /model · Ctrl+C twice to cancel${ANSI.reset}`;
+      repaint();
       return;
     }
 
@@ -191,54 +349,90 @@ export async function runRelayTui(options: RelayTuiOptions): Promise<void> {
       return;
     }
 
-    console.log("\n");
     cleanup();
+    process.stdout.write("\n");
     process.exit(0);
   });
 
   rl.on("line", (line) => {
     void (async () => {
-      const trimmed = line.trim();
+      const parsed = inputState.processRawLine(line, busy);
+      if (parsed.phase === "continue") {
+        statusLine = parsed.statusHint;
+        repaint();
+        return;
+      }
+
+      statusLine = parsed.statusHint;
+      const trimmed = parsed.displayLine.trim();
       if (!trimmed) {
-        rl.prompt();
+        repaint();
         return;
       }
 
-      if (trimmed === "exit" || trimmed === "quit" || trimmed === "q") {
-        cleanup();
-        return;
-      }
+      appendTranscript([`${INPUT_PROMPT}${parsed.displayLine}`]);
 
-      if (trimmed === "status" || trimmed === "progress") {
-        await showStatus();
-        rl.prompt();
-        return;
-      }
-
-      if (trimmed === "agents") {
-        await runAgentsPicker();
-        return;
-      }
-
-      if (trimmed === "models") {
-        await runModelsPicker();
-        return;
-      }
-
-      if (trimmed === "config") {
-        await runConfigWizard();
-        rl.prompt();
-        return;
-      }
-
-      if (trimmed === "help" || trimmed === "?") {
-        say("status · agents · models · config · quit — or type a goal");
-        rl.prompt();
-        return;
+      switch (parsed.action.type) {
+        case "noop":
+          repaint();
+          return;
+        case "quit":
+          cleanup();
+          return;
+        case "status":
+          await showStatus();
+          rl.prompt();
+          return;
+        case "agents":
+          await runAgentsPicker();
+          return;
+        case "models":
+          await runModelsPicker();
+          return;
+        case "config":
+          await runConfigWizard();
+          rl.prompt();
+          return;
+        case "help":
+          say("status · /status · agents · /agents · /harness · /model · /steer · models · config · quit — or type a goal");
+          rl.prompt();
+          return;
+        case "busy-block":
+          say(parsed.action.message);
+          rl.prompt();
+          return;
+        case "harness": {
+          localConfig.harnessOverride = parsed.action.harness;
+          await writeLocalConfig(cwd, localConfig);
+          say(formatHarnessOverrideAck(parsed.action.harness, busy));
+          rl.prompt();
+          return;
+        }
+        case "model": {
+          localConfig.nextModelOverride = parsed.action.model;
+          localConfig.modelMode = "manual";
+          await writeLocalConfig(cwd, localConfig);
+          say(formatModelOverrideAck(parsed.action.model, busy));
+          rl.prompt();
+          return;
+        }
+        case "hint":
+          say(parsed.action.message);
+          rl.prompt();
+          return;
+        case "steer": {
+          const ack = queueSteerMessage(steerQueue, parsed.action.message);
+          if (ack) say(ack);
+          else say("Steer message was empty.");
+          rl.prompt();
+          return;
+        }
+        case "run":
+          break;
       }
 
       if (busy) {
-        say(`${ANSI.yellow}Still working — status or Ctrl+C twice to cancel${ANSI.reset}`);
+        say(`${ANSI.yellow}Still working — /steer, /status, or Ctrl+C twice to cancel${ANSI.reset}`);
         rl.prompt();
         return;
       }
@@ -246,16 +440,28 @@ export async function runRelayTui(options: RelayTuiOptions): Promise<void> {
       busy = true;
       abortController = new AbortController();
       rl.pause();
-      runtime = { goal: trimmed };
+      runtime = { ...runtime, goal: trimmed };
+
+      const harnessOverride = localConfig.harnessOverride;
+      const nextModelOverride = localConfig.nextModelOverride;
+      if (harnessOverride || nextModelOverride) {
+        localConfig.harnessOverride = undefined;
+        localConfig.nextModelOverride = undefined;
+        await writeLocalConfig(cwd, localConfig);
+      }
 
       try {
         const result = await processPrompt(cwd, trimmed, {
           signal: abortController.signal,
+          steerQueue,
           enabledAgents:
             localConfig.enabledAgents.length > 0 ? localConfig.enabledAgents : undefined,
           modelOverrides: localConfig.modelOverrides,
           modelMode: localConfig.modelMode,
-          onLine: (row) => emit(row),
+          harnessOverride,
+          nextModelOverride,
+          onLine: (row) => emitLine(row),
+          onEvent: (event) => emitEvent(event),
         });
 
         if (!result.ok && !abortController.signal.aborted) {
@@ -263,9 +469,10 @@ export async function runRelayTui(options: RelayTuiOptions): Promise<void> {
         }
       } catch (error) {
         if (!abortController.signal.aborted) {
-          emit(error instanceof Error ? error.message : String(error));
+          emitLine(error instanceof Error ? error.message : String(error));
         }
       } finally {
+        steerQueue.clear();
         resetBusy();
       }
     })();
@@ -292,22 +499,54 @@ function updateRuntimeFromLine(line: string, runtime: RuntimeState): void {
 
   const agentMatch = line.match(/agent:\s*(\S+)/i);
   if (agentMatch) {
-    const token = agentMatch[1]!.toLowerCase();
-    if (token.includes("pi")) runtime.harness = "pi";
-    else if (token.includes("codex")) runtime.harness = "codex";
-    else if (token.includes("cursor")) runtime.harness = "cursor";
-    else if (token.includes("claude")) runtime.harness = "claude-code";
+    runtime.harness = parseHarnessToken(agentMatch[1]!);
   }
 
   const planMatch = line.match(/•\s*(Claude Code|Codex|Cursor|Pi)\b/);
   if (planMatch) {
-    const label = planMatch[1]!;
-    const map: Record<string, HarnessId> = {
-      "Claude Code": "claude-code",
-      Codex: "codex",
-      Cursor: "cursor",
-      Pi: "pi",
-    };
-    runtime.harness = map[label];
+    runtime.harness = harnessFromLabel(planMatch[1]!);
   }
+}
+
+function updateRuntimeFromEvent(event: HarnessEvent, runtime: RuntimeState): void {
+  switch (event.type) {
+    case "step_start":
+      runtime.harness = event.harness;
+      if (event.stepIndex !== undefined) runtime.step = event.stepIndex + 1;
+      if (event.totalSteps !== undefined) runtime.totalSteps = event.totalSteps;
+      break;
+    case "step_end":
+      runtime.harness = event.harness;
+      break;
+    case "agent_start":
+      if (event.harness) runtime.harness = event.harness;
+      break;
+    case "plan":
+      if (event.steps.length > 0) {
+        runtime.totalSteps = event.steps.length;
+        runtime.harness = event.steps[0]!.harness;
+      }
+      break;
+    default:
+      break;
+  }
+}
+
+function parseHarnessToken(token: string): HarnessId | undefined {
+  const lower = token.toLowerCase();
+  if (lower.includes("pi")) return "pi";
+  if (lower.includes("codex")) return "codex";
+  if (lower.includes("cursor")) return "cursor";
+  if (lower.includes("claude")) return "claude-code";
+  return undefined;
+}
+
+function harnessFromLabel(label: string): HarnessId {
+  const map: Record<string, HarnessId> = {
+    "Claude Code": "claude-code",
+    Codex: "codex",
+    Cursor: "cursor",
+    Pi: "pi",
+  };
+  return map[label] ?? "pi";
 }

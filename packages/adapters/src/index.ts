@@ -50,4 +50,12 @@ export {
   detectDrift,
 } from "./manifest.js";
 
-export { isBinaryInstalled, detectInstalledBinaries } from "./detect.js";
+export { isBinaryInstalled, detectInstalledBinaries, resolveBinaryPath } from "./detect.js";
+export { detectPiAuthProviders } from "./pi-auth.js";
+export type { PiProviderId } from "./pi-auth.js";
+export {
+  discoverPiListedModels,
+  parsePiListModels,
+  selectPiListedModel,
+} from "./pi-models.js";
+export type { PiListedModel } from "./pi-models.js";

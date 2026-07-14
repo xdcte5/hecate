@@ -87,6 +87,7 @@ rules, Pi overlay). Edit \`relay/\`, never the generated output.
 
 export const DEFAULT_POLICY = {
   routing: [],
+  // Pi first — breaks ability-score ties for implement steps.
   failover: ["pi", "cursor", "claude-code", "codex"],
   governance: { requireGitSnapshotOnHandoff: true, maxHandoffTokens: 8000, maxTranscriptLines: 200 },
 };

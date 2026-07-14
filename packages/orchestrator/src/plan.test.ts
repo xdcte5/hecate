@@ -84,4 +84,14 @@ describe("buildRunPlan", () => {
       expect.arrayContaining(["implement-frontend", "implement-backend"]),
     );
   });
+
+  it("plans implement parallel wave then codex test when auth and tests requested", async () => {
+    const { registry, sessionPolicy } = await loadRelayConfig(fixtureRoot);
+    const router = new ThinRouter(registry, sessionPolicy);
+    const plan = buildRunPlan("build portfolio site with auth and tests", router);
+
+    const wave0 = plan.steps.filter((step) => step.wave === 0);
+    expect(wave0).toHaveLength(2);
+    expect(plan.steps.some((step) => step.id === "test" && step.harness === "codex")).toBe(true);
+  });
 });

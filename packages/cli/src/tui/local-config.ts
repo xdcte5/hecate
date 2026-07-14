@@ -8,6 +8,10 @@ export type LocalConfig = {
   enabledAgents: HarnessId[];
   modelOverrides: Partial<Record<HarnessId, string>>;
   modelMode: ModelMode;
+  /** Force the next orchestrated run onto this harness, then clear. */
+  harnessOverride?: HarnessId;
+  /** Force the next orchestrated run onto this model, then clear. */
+  nextModelOverride?: string;
 };
 
 export const LOCAL_CONFIG_RELATIVE = join(".relay", "local-config.json");
@@ -37,6 +41,10 @@ export async function readLocalConfig(cwd: string): Promise<LocalConfig> {
           ? parsed.modelOverrides
           : {},
       modelMode: parsed.modelMode === "manual" ? "manual" : "auto",
+      harnessOverride:
+        typeof parsed.harnessOverride === "string" ? (parsed.harnessOverride as HarnessId) : undefined,
+      nextModelOverride:
+        typeof parsed.nextModelOverride === "string" ? parsed.nextModelOverride : undefined,
     };
   } catch {
     return defaultLocalConfig();
@@ -49,6 +57,8 @@ export async function writeLocalConfig(cwd: string, config: LocalConfig): Promis
     enabledAgents: config.enabledAgents,
     modelOverrides: config.modelOverrides,
     modelMode: config.modelMode,
+    ...(config.harnessOverride ? { harnessOverride: config.harnessOverride } : {}),
+    ...(config.nextModelOverride ? { nextModelOverride: config.nextModelOverride } : {}),
   };
   await writeFile(localConfigPath(cwd), `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
@@ -61,10 +71,14 @@ export function formatLocalConfigSummary(config: LocalConfig): string[] {
     overrides.length > 0
       ? overrides.map(([h, m]) => `  ${h}: ${m}`)
       : ["  (none — ability-based auto)"];
+  const pending: string[] = [];
+  if (config.harnessOverride) pending.push(`Next harness: ${config.harnessOverride}`);
+  if (config.nextModelOverride) pending.push(`Next model: ${config.nextModelOverride}`);
   return [
     `Enabled agents: ${agents}`,
     `Model mode: ${config.modelMode}`,
     "Model overrides:",
     ...modelLines,
+    ...(pending.length > 0 ? ["Pending overrides:", ...pending.map((line) => `  ${line}`)] : []),
   ];
 }

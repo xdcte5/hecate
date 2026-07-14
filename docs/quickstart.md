@@ -87,3 +87,26 @@ relay trace              # see the whole hop history
 ```
 
 That's the magical moment: Claude → Cursor (or Codex, or Pi) carrying one Product Session.
+
+## 6. Fusion chat demo (Pi × Relay)
+
+For the full automatic mesh loop — one prompt, plan, execute, verify — use chat mode:
+
+```bash
+cd fixtures/minimal-relay   # sample project with relay/ preconfigured
+relay
+# you › add a demo feature
+# → Relay plans steps, runs Pi (or failover), streams tool events
+# → No manual handoff / next / done
+```
+
+Author skills under `relay/skills/` and sub-agents under `relay/agents/`. Pi RPC sessions
+receive skill paths via `RELAY_SKILLS_*` env vars. See [skills-bridge.md](./skills-bridge.md).
+
+`relay dash` is deprecated — plan panels and handoff hops are merging into chat mode.
+
+### CI / mock driver
+
+Set `RELAY_MOCK_DRIVER=1` to run the orchestrator with a deterministic mock harness (no
+real agent CLIs). The fusion E2E test in `fixtures/minimal-relay/e2e/fusion.test.ts`
+exercises prompt → plan → step events this way.

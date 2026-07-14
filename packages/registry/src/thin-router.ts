@@ -1,5 +1,5 @@
 import type { HarnessId, Registry, SessionPolicy } from "@relay/schema";
-import { ModelRouter, type RouteModelReason, type RouteModelResult } from "./model-router.js";
+import { ModelRouter, routeModel, type RouteModelOptions, type RouteModelReason, type RouteModelResult } from "./model-router.js";
 import { TaskRouter, routeTask, type RouteTaskReason, type RouteTaskResult } from "./task-router.js";
 
 export type SelectHarnessReason = RouteTaskReason;
@@ -40,9 +40,10 @@ export class ThinRouter {
   constructor(
     private readonly registry: Registry,
     private readonly policy: SessionPolicy,
+    modelOptions: RouteModelOptions = {},
   ) {
     this.taskRouter = new TaskRouter(registry, policy);
-    this.modelRouter = new ModelRouter(registry);
+    this.modelRouter = new ModelRouter(registry, modelOptions);
   }
 
   selectHarness(task: string): HarnessId {

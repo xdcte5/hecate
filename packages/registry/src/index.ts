@@ -24,6 +24,13 @@ export {
 export {
   ModelRouter,
   routeModel,
+  type RouteModelOptions,
   type RouteModelReason,
   type RouteModelResult,
 } from "./model-router.js";
+
+export {
+  inferModelProvider,
+  isModelProviderAvailable,
+  type ModelProviderId,
+} from "./model-provider.js";

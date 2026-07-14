@@ -43,4 +43,19 @@ describe("rhp-builder", () => {
     expect(handoffMarkdown).toContain("Use JWT for auth");
     expect(renderHandoffMarkdown(bundle)).toBe(handoffMarkdown);
   });
+
+  it("trims oversized handoff bundles to maxHandoffTokens", () => {
+    const session = emptyRhpV1("sess-2", "x".repeat(5000), "pi");
+    for (let i = 0; i < 50; i += 1) {
+      session.decisions.push({
+        id: `d-${i}`,
+        at: new Date().toISOString(),
+        text: `Decision ${i}: ${"detail ".repeat(40)}`,
+      });
+    }
+
+    const { bundle } = buildHandoffArtifacts(session, "codex", undefined, 200);
+    expect(bundle.decisions.length).toBeLessThan(50);
+    expect(JSON.stringify(bundle).length).toBeLessThan(5000);
+  });
 });

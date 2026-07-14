@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import os from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import type { Registry } from "@relay/schema";
 import { formatAgentScanList, scanLocalAgents } from "./agent-picker.js";
 
@@ -26,7 +29,27 @@ const registry: Registry = {
 };
 
 describe("agent-picker", () => {
+  let tmpHome = "";
+  let prevHome: string | undefined;
+
+  let prevNvmBin: string | undefined;
+
+  afterEach(() => {
+    if (tmpHome) rmSync(tmpHome, { recursive: true, force: true });
+    tmpHome = "";
+    if (prevHome === undefined) delete process.env.HOME;
+    else process.env.HOME = prevHome;
+    if (prevNvmBin === undefined) delete process.env.NVM_BIN;
+    else process.env.NVM_BIN = prevNvmBin;
+  });
+
   it("marks agents missing from a mocked PATH", async () => {
+    tmpHome = mkdtempSync(join(os.tmpdir(), "relay-agent-scan-"));
+    prevHome = process.env.HOME;
+    prevNvmBin = process.env.NVM_BIN;
+    process.env.HOME = tmpHome;
+    delete process.env.NVM_BIN;
+
     const scan = await scanLocalAgents(registry, "/nonexistent-bin-dir");
     expect(scan).toHaveLength(3);
     expect(scan.every((entry) => !entry.installed)).toBe(true);

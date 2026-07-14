@@ -20,6 +20,10 @@ export { parseInputCommand } from "./input.js";
 
 export async function runDash(options: DashOptions): Promise<void> {
   const { cwd } = options;
+
+  process.stdout.write("\x1b[33mrelay dash is deprecated\x1b[0m — use \x1b[36mrelay\x1b[0m (chat mode) instead.\n");
+  process.stdout.write("Plan panels and handoff hops are merging into the chat TUI.\n\n");
+
   let message: string | undefined;
   let messageTone: "ok" | "hint" | "error" = "ok";
   let running = true;
@@ -100,7 +104,7 @@ export async function runDash(options: DashOptions): Promise<void> {
       });
       message = result.message;
       messageTone = "ok";
-    } else {
+    } else if (parsed.kind === "relay") {
       message = runRelay(parsed.args);
     }
   }

@@ -50,3 +50,15 @@ describe("SessionPolicyGovernanceSchema", () => {
     });
   });
 });
+
+describe("SessionPolicyVerificationSchema", () => {
+  it("defaults verification gate to enabled", () => {
+    const policy = SessionPolicySchema.parse({
+      routing: [],
+      failover: ["pi"],
+      verification: {},
+    });
+
+    expect(policy.verification).toEqual({ enableTestGate: true });
+  });
+});

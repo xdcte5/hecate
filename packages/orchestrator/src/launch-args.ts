@@ -50,9 +50,10 @@ export function buildLaunchArgs(harness: HarnessId, prompt: string, model?: stri
 }
 
 export function formatModelLabel(modelId: string): string {
-  if (modelId.startsWith("claude-")) {
-    const parts = modelId.split("-");
-    return parts[1] ?? modelId;
+  const bare = modelId.includes("/") ? modelId.slice(modelId.indexOf("/") + 1) : modelId;
+  if (bare.startsWith("claude-")) {
+    const parts = bare.split("-");
+    return parts[1] ?? bare;
   }
-  return modelId;
+  return bare;
 }

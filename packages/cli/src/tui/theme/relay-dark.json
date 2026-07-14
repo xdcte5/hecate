@@ -1,0 +1,40 @@
+{
+  "name": "relay-dark",
+  "description": "Relay dark palette — Pi-inspired with cyan mesh accents",
+  "colors": {
+    "background": "#0d1117",
+    "foreground": "#e6edf3",
+    "dim": "#7d8590",
+    "accent": "#58a6ff",
+    "accentBright": "#79c0ff",
+    "cyan": "#39c5cf",
+    "relayBrand": "#22d3ee",
+    "success": "#3fb950",
+    "warning": "#d29922",
+    "error": "#f85149",
+    "magenta": "#bc8cff",
+    "harness": {
+      "claude-code": "#e3b341",
+      "codex": "#3fb950",
+      "cursor": "#58a6ff",
+      "pi": "#bc8cff"
+    },
+    "border": "#30363d",
+    "footerBg": "#1f6feb",
+    "headerBg": "#161b22"
+  },
+  "ansi": {
+    "reset": "\u001b[0m",
+    "bold": "\u001b[1m",
+    "dim": "\u001b[2m",
+    "cyan": "\u001b[36m",
+    "blue": "\u001b[34m",
+    "yellow": "\u001b[33m",
+    "green": "\u001b[32m",
+    "red": "\u001b[31m",
+    "magenta": "\u001b[35m",
+    "gray": "\u001b[90m",
+    "white": "\u001b[97m",
+    "bgBlue": "\u001b[44m"
+  }
+}
