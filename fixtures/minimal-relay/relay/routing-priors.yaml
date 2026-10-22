@@ -1,0 +1,27 @@
+version: "1"
+updated: "2026-07-14"
+sources:
+  - fixture
+task_types:
+  implement:
+    codex/o4-mini: 0.82
+    pi/openai-codex/gpt-5.4: 0.8
+    cursor/composer-2: 0.74
+    claude-code/claude-sonnet-4-6: 0.68
+  fix:
+    claude-code/claude-opus-4-6: 0.9
+    cursor/composer-2: 0.75
+    codex/o4-mini: 0.7
+  test:
+    codex/o4-mini: 0.88
+    pi/openai-codex/gpt-5.4: 0.76
+signal_adjustments:
+  - signal: frontend
+    adjustment: 0.08
+    target: cursor
+  - signal: test
+    adjustment: 0.1
+    target: codex/o4-mini
+  - signal: script
+    adjustment: 0.08
+    target: pi

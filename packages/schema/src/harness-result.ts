@@ -12,5 +12,8 @@ export const HarnessResultSchema = z.object({
   error: z.string().optional(),
   durationMs: z.number().int().nonnegative().optional(),
   toolCallCount: z.number().int().nonnegative().optional(),
+  inputTokens: z.number().int().nonnegative().optional(),
+  outputTokens: z.number().int().nonnegative().optional(),
+  costUsd: z.number().nonnegative().optional(),
 });
 export type HarnessResult = z.infer<typeof HarnessResultSchema>;

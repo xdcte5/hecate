@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { evaluateBrownfieldKpis, SessionStore, validateSession } from "@relay/session";
 import { detectDrift, readRelayLock } from "@relay/adapters";
+import { printRoutingDiagnostics } from "../routing/diagnostics.js";
 
 /**
  * Check manifest-owned generated files against relay.lock. Returns true when
@@ -52,15 +53,26 @@ export function registerDoctorCommands(program: Command, getCwd: () => string): 
     .description("Diagnose relay setup")
     .option("--session [id]", "Validate session integrity (active session if no id)")
     .option("--kpi", "Run Brownfield KPI checks on active session")
+    .option("--routing", "Show blended routing config, priors, local stats, and route preview")
     .option("--build", "Check generated files against relay.lock (default)")
-    .action(async (options: { session?: string | true; kpi?: boolean; build?: boolean }) => {
+    .action(async (options: {
+      session?: string | true;
+      kpi?: boolean;
+      routing?: boolean;
+      build?: boolean;
+    }) => {
       const cwd = getCwd();
 
+      if (options.routing) {
+        await printRoutingDiagnostics(cwd);
+        if (!options.session && !options.kpi && !options.build) return;
+      }
+
       // Default check (no flags) is build/drift; explicit --build too.
-      if (options.build || (options.session === undefined && !options.kpi)) {
+      if (options.build || (options.session === undefined && !options.kpi && !options.routing)) {
         const clean = await checkBuildDrift(cwd);
         if (!clean) process.exitCode = 1;
-        if (!options.session && !options.kpi) return;
+        if (!options.session && !options.kpi && !options.routing) return;
       }
 
       if (options.kpi) {

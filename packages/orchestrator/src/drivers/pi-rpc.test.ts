@@ -6,14 +6,27 @@ import { serializeJsonLine } from "./jsonl.js";
 
 const mockSpawn = vi.hoisted(() => vi.fn());
 const mockListChangedFiles = vi.hoisted(() => vi.fn());
+const mockInstallMcpHarnessConfigs = vi.hoisted(() => vi.fn());
 
-vi.mock("node:child_process", () => ({
-  spawn: mockSpawn,
-}));
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
+  return {
+    ...actual,
+    spawn: mockSpawn,
+  };
+});
 
 vi.mock("../verify.js", () => ({
   listChangedFiles: mockListChangedFiles,
 }));
+
+vi.mock("@relay/adapters", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@relay/adapters")>();
+  return {
+    ...actual,
+    installMcpHarnessConfigs: mockInstallMcpHarnessConfigs,
+  };
+});
 
 vi.mock("../skills-bridge.js", () => ({
   loadRelaySkills: vi.fn().mockResolvedValue([]),
@@ -66,6 +79,40 @@ async function waitForPrompt(stdinChunks: string[]): Promise<void> {
   throw new Error("prompt command was not written");
 }
 
+async function respondToSessionStats(
+  child: MockChild,
+  stdinChunks: string[],
+  data: Record<string, unknown> = {},
+): Promise<void> {
+  for (let i = 0; i < 50; i++) {
+    const statsCmd = stdinChunks
+      .map((chunk) => {
+        try {
+          return JSON.parse(chunk) as Record<string, unknown>;
+        } catch {
+          return null;
+        }
+      })
+      .find((command) => command?.type === "get_session_stats");
+    if (statsCmd) {
+      emitLine(child, {
+        id: statsCmd.id,
+        type: "response",
+        command: "get_session_stats",
+        success: true,
+        data: {
+          tokens: { input: 100, output: 40, total: 140 },
+          cost: 0.0012,
+          ...data,
+        },
+      });
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error("get_session_stats command was not written");
+}
+
 function baseRequest(overrides: Partial<DriverRequest> = {}): DriverRequest {
   return {
     cwd: "/tmp/project",
@@ -90,6 +137,7 @@ describe("PiRpcDriver", () => {
     });
     mockSpawn.mockReturnValue(child);
     mockListChangedFiles.mockResolvedValue(["README.md"]);
+    mockInstallMcpHarnessConfigs.mockResolvedValue({ targets: [], serverCount: 0 });
   });
 
   afterEach(() => {
@@ -132,9 +180,15 @@ describe("PiRpcDriver", () => {
       message: {
         role: "assistant",
         content: [{ type: "text", text: "Done updating README." }],
+        usage: {
+          input: 100,
+          output: 40,
+          cost: { total: 0.0012 },
+        },
       },
     });
     emitLine(child, { type: "agent_settled" });
+    await respondToSessionStats(child, stdinChunks);
 
     const result = await runPromise;
 
@@ -144,6 +198,9 @@ describe("PiRpcDriver", () => {
       summary: "Pi finished.",
       toolCallCount: 1,
       filesTouched: ["README.md"],
+      inputTokens: 100,
+      outputTokens: 40,
+      costUsd: 0.0012,
     });
     expect(lines).toEqual([
       "prompt accepted — agent running…",
@@ -158,7 +215,9 @@ describe("PiRpcDriver", () => {
       "tool_start",
       "tool_end",
       "agent_message",
+      "usage",
       "agent_end",
+      "usage",
     ]);
     expect(JSON.parse(stdinChunks[0]!)).toMatchObject({
       type: "prompt",
@@ -207,6 +266,10 @@ describe("PiRpcDriver", () => {
     emitLine(child, { type: "tool_execution_start", toolCallId: "b", toolName: "write" });
     emitLine(child, { type: "tool_execution_end", toolCallId: "b", toolName: "write", isError: false });
     emitLine(child, { type: "agent_settled" });
+    await respondToSessionStats(child, stdinChunks, {
+      tokens: { input: 0, output: 0, total: 0 },
+      cost: 0,
+    });
 
     await runPromise;
 
@@ -232,6 +295,7 @@ describe("PiRpcDriver", () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
 
     emitLine(child, { type: "agent_settled" });
+    await respondToSessionStats(child, stdinChunks);
 
     await runPromise;
 
@@ -281,6 +345,7 @@ describe("PiRpcDriver", () => {
       error: "boom",
     });
     emitLine(child, { type: "agent_settled" });
+    await respondToSessionStats(child, stdinChunks);
 
     const result = await runPromise;
 
@@ -288,6 +353,128 @@ describe("PiRpcDriver", () => {
       ok: false,
       summary: "boom",
     });
+  });
+
+  it("prefers get_session_stats usage over summed message_end totals", async () => {
+    const promptId = "relay-1";
+    const runPromise = new PiRpcDriver().run(baseRequest());
+
+    emitLine(child, { id: promptId, type: "response", command: "prompt", success: true });
+    emitLine(child, {
+      type: "message_end",
+      message: {
+        role: "assistant",
+        usage: { input: 10, output: 5, cost: { total: 0.0001 } },
+      },
+    });
+    emitLine(child, { type: "agent_settled" });
+    await respondToSessionStats(child, stdinChunks, {
+      tokens: { input: 500, output: 200, total: 700 },
+      cost: 0.05,
+    });
+
+    const result = await runPromise;
+
+    expect(result).toMatchObject({
+      ok: true,
+      inputTokens: 500,
+      outputTokens: 200,
+      costUsd: 0.05,
+    });
+  });
+
+  it("falls back to message_end usage when get_session_stats fails", async () => {
+    const promptId = "relay-1";
+    const runPromise = new PiRpcDriver().run(baseRequest());
+
+    emitLine(child, { id: promptId, type: "response", command: "prompt", success: true });
+    emitLine(child, {
+      type: "message_end",
+      message: {
+        role: "assistant",
+        usage: { input: 80, output: 20, cost: { total: 0.002 } },
+      },
+    });
+    emitLine(child, { type: "agent_settled" });
+
+    for (let i = 0; i < 50; i++) {
+      const statsCmd = stdinChunks
+        .map((chunk) => {
+          try {
+            return JSON.parse(chunk) as Record<string, unknown>;
+          } catch {
+            return null;
+          }
+        })
+        .find((command) => command?.type === "get_session_stats");
+      if (statsCmd) {
+        emitLine(child, {
+          id: statsCmd.id,
+          type: "response",
+          command: "get_session_stats",
+          success: false,
+          error: "stats unavailable",
+        });
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+
+    const result = await runPromise;
+
+    expect(result).toMatchObject({
+      ok: true,
+      inputTokens: 80,
+      outputTokens: 20,
+      costUsd: 0.002,
+    });
+  });
+
+  it("auto-installs MCP configs when relay/mcp.json exists", async () => {
+    const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const { tmpdir } = await import("node:os");
+    const cwd = mkdtempSync(join(tmpdir(), "relay-pi-mcp-"));
+    mkdirSync(join(cwd, "relay"), { recursive: true });
+    writeFileSync(join(cwd, "relay/mcp.json"), '{"mcpServers":{}}');
+
+    const promptId = "relay-1";
+    const runPromise = new PiRpcDriver().run(baseRequest({ cwd }));
+
+    emitLine(child, { id: promptId, type: "response", command: "prompt", success: true });
+    emitLine(child, { type: "agent_settled" });
+    await respondToSessionStats(child, stdinChunks);
+
+    await runPromise;
+
+    expect(mockInstallMcpHarnessConfigs).toHaveBeenCalledWith(cwd);
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  it("warns but continues when MCP auto-install fails", async () => {
+    const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const { tmpdir } = await import("node:os");
+    const cwd = mkdtempSync(join(tmpdir(), "relay-pi-mcp-fail-"));
+    mkdirSync(join(cwd, "relay"), { recursive: true });
+    writeFileSync(join(cwd, "relay/mcp.json"), '{"mcpServers":{}}');
+    mockInstallMcpHarnessConfigs.mockRejectedValueOnce(new Error("disk full"));
+
+    const lines: string[] = [];
+    const promptId = "relay-1";
+    const runPromise = new PiRpcDriver().run(
+      baseRequest({ cwd, onLine: (line) => lines.push(line) }),
+    );
+
+    emitLine(child, { id: promptId, type: "response", command: "prompt", success: true });
+    emitLine(child, { type: "agent_settled" });
+    await respondToSessionStats(child, stdinChunks);
+
+    const result = await runPromise;
+
+    expect(result.ok).toBe(true);
+    expect(lines.some((line) => line.includes("MCP auto-install failed"))).toBe(true);
+    rmSync(cwd, { recursive: true, force: true });
   });
 
   it("does not treat early process exit as success", async () => {

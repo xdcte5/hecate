@@ -1,33 +1,46 @@
-/** Map registry / Pi model ids to the LLM provider they require. */
-export type ModelProviderId = "anthropic" | "openai" | "google" | "github" | "mistral" | "openrouter";
+/** Normalized provider id inferred from a model spec or registry model id. */
+export type ModelProviderId = string;
 
-export function inferModelProvider(modelId: string): ModelProviderId | undefined {
-  const id = modelId.toLowerCase();
-  if (id.startsWith("claude")) return "anthropic";
-  if (id.startsWith("gpt") || /^o\d/.test(id) || id.includes("codex") || id.includes("chatgpt")) {
-    return "openai";
+/** Infer the LLM provider backing a Pi spec (`provider/model`) or registry model id. */
+export function inferModelProvider(specOrId: string): ModelProviderId {
+  const trimmed = specOrId.trim().toLowerCase();
+  if (!trimmed) return "";
+
+  if (trimmed.includes("/")) {
+    return trimmed.split("/")[0]!;
   }
-  if (id.startsWith("gemini")) return "google";
-  if (id.includes("copilot") || id.includes("github")) return "github";
-  if (id.startsWith("mistral")) return "mistral";
-  return undefined;
+
+  if (/\b(claude|anthropic|sonnet|opus)\b/.test(trimmed)) return "anthropic";
+  if (/\b(gpt|o[34]|codex|chatgpt)\b/.test(trimmed)) return "openai";
+  if (/\b(gemini|google)\b/.test(trimmed)) return "google";
+  if (/\b(mistral)\b/.test(trimmed)) return "mistral";
+  if (/\b(github|copilot)\b/.test(trimmed)) return "github";
+  if (/\b(openrouter)\b/.test(trimmed)) return "openrouter";
+
+  return trimmed;
 }
 
+/**
+ * Whether a model can run given authenticated Pi providers.
+ * When auth is non-empty, unknown providers fail closed.
+ */
 export function isModelProviderAvailable(
-  modelId: string,
-  available: Set<string>,
+  specOrId: string,
+  authProviders: Set<string>,
 ): boolean {
-  if (available.size === 0) return true;
+  if (authProviders.size === 0) return true;
 
-  const providerFromSpec = modelId.includes("/") ? modelId.split("/")[0] : undefined;
-  const provider = providerFromSpec ?? inferModelProvider(modelId);
-  if (!provider) return true;
+  const provider = inferModelProvider(specOrId);
+  if (!provider) return false;
+  if (authProviders.has(provider)) return true;
 
-  if (available.has(provider)) return true;
-  if (provider === "openai-codex" && available.has("openai")) return true;
-  if (provider.includes("openai") && available.has("openai-codex")) return true;
-  if (provider.includes("openai") && [...available].some((id) => id.includes("openai"))) {
-    return true;
+  for (const authed of authProviders) {
+    const normalized = authed.toLowerCase();
+    if (provider === normalized) return true;
+    if (provider.startsWith(`${normalized}-`) || normalized.startsWith(`${provider}-`)) {
+      return true;
+    }
   }
+
   return false;
 }

@@ -32,12 +32,22 @@ export {
 
 export {
   RoutingRuleSchema,
+  RoutingBlendSchema,
+  RoutingConfigSchema,
+  StepRoutingRuleSchema,
+  StepRoutingSchema,
   SessionPolicyGovernanceSchema,
   SessionPolicyVerificationSchema,
   SessionPolicySchema,
   resolveSessionPolicyGovernance,
   resolveSessionPolicyVerification,
+  resolveSessionPolicyRoutingConfig,
+  resolveSessionPolicyStepRouting,
   type RoutingRule,
+  type RoutingBlend,
+  type RoutingConfig,
+  type StepRoutingRule,
+  type StepRouting,
   type SessionPolicy,
   type SessionPolicyGovernance,
   type SessionPolicyVerification,
@@ -84,6 +94,9 @@ export {
   HandoffEventSchema,
   RetryStartEventSchema,
   RetryEndEventSchema,
+  UsageEventSchema,
+  VerifyOutcomeEventSchema,
+  GraphNodeEventSchema,
   HarnessEventSchema,
   type PlanStepEvent,
   type StepStartEvent,
@@ -98,5 +111,22 @@ export {
   type HandoffEvent,
   type RetryStartEvent,
   type RetryEndEvent,
+  type UsageEvent,
+  type VerifyOutcomeEvent,
+  type GraphNodeEvent,
   type HarnessEvent,
 } from "./harness-event.js";
+
+export {
+  RoutingOutcomeSchema,
+  type RoutingOutcome,
+} from "./routing-outcome.js";
+
+export {
+  HarnessModelScoreMapSchema,
+  SignalAdjustmentSchema,
+  RoutingPriorsSchema,
+  type HarnessModelScoreMap,
+  type SignalAdjustment,
+  type RoutingPriors,
+} from "./routing-priors.js";

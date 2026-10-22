@@ -1,15 +1,168 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { HarnessEvent, HarnessId } from "@relay/schema";
 import { buildAgentPrompt, buildLaunchArgs } from "../launch-args.js";
-import { HarnessEventEmitter } from "../events.js";
+import { HarnessEventEmitter, makeUsageEvent } from "../events.js";
 import type { HarnessDriver, DriverRequest, HarnessRunResult } from "./types.js";
 
 export type ParsedToolLine = {
   toolName: string;
   args?: Record<string, unknown>;
 } | null;
+
+export type StreamUsage = {
+  inputTokens?: number;
+  outputTokens?: number;
+  costUsd?: number;
+};
+
+export function safeInt(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+    return Math.trunc(value);
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed >= 0) return Math.trunc(parsed);
+  }
+  return undefined;
+}
+
+export function safeFloat(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  }
+  return undefined;
+}
+
+/** Parse token/cost usage from Claude `result` or Codex `turn.completed` JSONL lines. */
+export function parseUsageFromStreamLine(line: string): StreamUsage | null {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("{")) return null;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== "object") return null;
+  const event = parsed as Record<string, unknown>;
+
+  if (event.type === "result") {
+    const usage =
+      event.usage && typeof event.usage === "object"
+        ? (event.usage as Record<string, unknown>)
+        : undefined;
+    const inputTokens = safeInt(usage?.input_tokens);
+    const outputTokens = safeInt(usage?.output_tokens);
+    const costUsd = safeFloat(event.total_cost_usd ?? event.cost_usd);
+    if (inputTokens === undefined && outputTokens === undefined && costUsd === undefined) {
+      return null;
+    }
+    return { inputTokens, outputTokens, costUsd };
+  }
+
+  if (event.type === "turn.completed") {
+    const usage =
+      event.usage && typeof event.usage === "object"
+        ? (event.usage as Record<string, unknown>)
+        : undefined;
+    const inputTokens = safeInt(usage?.input_tokens);
+    const outputTokens = safeInt(usage?.output_tokens);
+    if (inputTokens === undefined && outputTokens === undefined) return null;
+    return { inputTokens, outputTokens };
+  }
+
+  return null;
+}
+
+export function mergeUsage(current: StreamUsage, next: StreamUsage): StreamUsage {
+  return {
+    ...(current.inputTokens !== undefined ? { inputTokens: current.inputTokens } : {}),
+    ...(current.outputTokens !== undefined ? { outputTokens: current.outputTokens } : {}),
+    ...(current.costUsd !== undefined ? { costUsd: current.costUsd } : {}),
+    ...(next.inputTokens !== undefined ? { inputTokens: next.inputTokens } : {}),
+    ...(next.outputTokens !== undefined ? { outputTokens: next.outputTokens } : {}),
+    ...(next.costUsd !== undefined ? { costUsd: next.costUsd } : {}),
+  };
+}
+
+export function accumulateUsage(current: StreamUsage, next: StreamUsage): StreamUsage {
+  const inputTokens =
+    current.inputTokens !== undefined || next.inputTokens !== undefined
+      ? (current.inputTokens ?? 0) + (next.inputTokens ?? 0)
+      : undefined;
+  const outputTokens =
+    current.outputTokens !== undefined || next.outputTokens !== undefined
+      ? (current.outputTokens ?? 0) + (next.outputTokens ?? 0)
+      : undefined;
+  const costUsd =
+    current.costUsd !== undefined || next.costUsd !== undefined
+      ? (current.costUsd ?? 0) + (next.costUsd ?? 0)
+      : undefined;
+  return { inputTokens, outputTokens, costUsd };
+}
+
+/** Parse authoritative token/cost usage from Pi RPC `get_session_stats` response. */
+export function parseUsageFromSessionStats(response: Record<string, unknown>): StreamUsage | null {
+  if (response.type !== "response" || response.command !== "get_session_stats") return null;
+  if (response.success === false) return null;
+
+  const data = response.data;
+  if (!data || typeof data !== "object") return null;
+  const dataRecord = data as Record<string, unknown>;
+
+  const tokens = dataRecord.tokens;
+  if (!tokens || typeof tokens !== "object") return null;
+  const tokensRecord = tokens as Record<string, unknown>;
+
+  const inputTokens = safeInt(tokensRecord.input);
+  const outputTokens = safeInt(tokensRecord.output);
+  const costUsd = safeFloat(dataRecord.cost);
+
+  if (inputTokens === undefined && outputTokens === undefined && costUsd === undefined) {
+    return null;
+  }
+  return { inputTokens, outputTokens, costUsd };
+}
+
+/** Parse token/cost usage from Pi RPC `message_end` assistant events. */
+export function parseUsageFromPiEvent(event: Record<string, unknown>): StreamUsage | null {
+  if (event.type !== "message_end") return null;
+  const message = event.message;
+  if (!message || typeof message !== "object") return null;
+  const role = (message as { role?: unknown }).role;
+  if (role !== "assistant") return null;
+
+  const usage = (message as { usage?: unknown }).usage;
+  if (!usage || typeof usage !== "object") return null;
+  const usageRecord = usage as Record<string, unknown>;
+
+  const inputTokens = safeInt(usageRecord.input);
+  const outputTokens = safeInt(usageRecord.output);
+  const costObj =
+    usageRecord.cost && typeof usageRecord.cost === "object"
+      ? (usageRecord.cost as Record<string, unknown>)
+      : undefined;
+  const costUsd = safeFloat(costObj?.total ?? usageRecord.cost);
+
+  if (inputTokens === undefined && outputTokens === undefined && costUsd === undefined) {
+    return null;
+  }
+  return { inputTokens, outputTokens, costUsd };
+}
+
+export function usageFields(usage: StreamUsage): Pick<HarnessRunResult, "inputTokens" | "outputTokens" | "costUsd"> {
+  return {
+    ...(usage.inputTokens !== undefined ? { inputTokens: usage.inputTokens } : {}),
+    ...(usage.outputTokens !== undefined ? { outputTokens: usage.outputTokens } : {}),
+    ...(usage.costUsd !== undefined ? { costUsd: usage.costUsd } : {}),
+  };
+}
 
 function now(): string {
   return new Date().toISOString();
@@ -78,6 +231,10 @@ export abstract class StreamingCliDriver implements HarnessDriver {
 
     const args = buildLaunchArgs(request.harness, prompt, request.model);
     const timeoutMs = request.timeoutMs ?? 10 * 60 * 1000;
+    const captureUsage = process.env.RELAY_CAPTURE_USAGE === "1";
+    const usageLogPath = captureUsage
+      ? join(dir, `${request.harness}-stream.jsonl`)
+      : undefined;
 
     return new Promise((resolve) => {
       let stdout = "";
@@ -87,6 +244,7 @@ export abstract class StreamingCliDriver implements HarnessDriver {
       let settled = false;
       let child: ChildProcess;
       const openTools = new Map<string, string>();
+      let usage: StreamUsage = {};
 
       const finish = (result: HarnessRunResult) => {
         if (settled) return;
@@ -138,6 +296,12 @@ export abstract class StreamingCliDriver implements HarnessDriver {
         const trimmed = line.trim();
         if (!trimmed) return;
 
+        const parsedUsage = parseUsageFromStreamLine(trimmed);
+        if (parsedUsage) {
+          usage = mergeUsage(usage, parsedUsage);
+          this.emit(makeUsageEvent(usage), request);
+        }
+
         if (isStderr) {
           request.onLine?.(`[stderr] ${trimmed}`);
           return;
@@ -187,10 +351,20 @@ export abstract class StreamingCliDriver implements HarnessDriver {
         request.onLine?.(trimmed);
       };
 
+      const recordUsageLine = (line: string) => {
+        if (!usageLogPath || !line.trim().startsWith("{")) return;
+        void appendFile(usageLogPath, `${line.trim()}\n`, "utf8").catch(() => {
+          // best-effort usage capture for benchmarks
+        });
+      };
+
       child.stdout?.on("data", (chunk) => {
         const text = String(chunk);
         stdout += text;
-        stdoutPartial = emitLines(stdoutPartial + text, (line) => handleLine(line));
+        stdoutPartial = emitLines(stdoutPartial + text, (line) => {
+          recordUsageLine(line);
+          handleLine(line);
+        });
       });
 
       child.stderr?.on("data", (chunk) => {
@@ -217,6 +391,7 @@ export abstract class StreamingCliDriver implements HarnessDriver {
             summary: `${request.harness} finished.`,
             output: tail || undefined,
             toolCallCount: openTools.size,
+            ...usageFields(usage),
           });
           return;
         }
@@ -227,6 +402,7 @@ export abstract class StreamingCliDriver implements HarnessDriver {
           summary: `${request.harness} failed (exit ${code ?? "?"}).`,
           output: tail || stderr.trim() || undefined,
           toolCallCount: openTools.size > 0 ? openTools.size : undefined,
+          ...usageFields(usage),
         });
       });
     });

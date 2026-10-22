@@ -34,6 +34,25 @@ function truncateDiff(text: string, maxBytes: number): string {
   return `${text.slice(0, maxBytes)}\n\n… (diff truncated)`;
 }
 
+function parseStatusPaths(status: string | null): string[] {
+  if (!status) return [];
+
+  const paths = new Set<string>();
+  for (const line of status.split("\n")) {
+    if (!line.trim()) continue;
+    const path =
+      line[2] === " "
+        ? line.slice(3)
+        : line[1] === " "
+          ? line.slice(2)
+          : "";
+    if (!path) continue;
+    const renameTarget = path.includes(" -> ") ? path.slice(path.lastIndexOf(" -> ") + 4) : path;
+    paths.add(renameTarget);
+  }
+  return [...paths];
+}
+
 export async function captureGitSnapshot(
   rootDir: string,
   options: GitSnapshotOptions = {},
@@ -47,14 +66,12 @@ export async function captureGitSnapshot(
     runGit(rootDir, ["rev-parse", "--abbrev-ref", "HEAD"]),
     runGit(rootDir, ["rev-parse", "HEAD"]),
     runGit(rootDir, ["remote", "get-url", "origin"]),
-    runGit(rootDir, ["diff", "--name-only", "HEAD"]),
+    runGit(rootDir, ["status", "--porcelain"]),
   ]);
 
   if (!branch || !head) return null;
 
-  const dirty_files = dirtyRaw
-    ? dirtyRaw.split("\n").map((f) => f.trim()).filter(Boolean)
-    : [];
+  const dirty_files = parseStatusPaths(dirtyRaw);
 
   const snapshot: GitSnapshot = {
     remote: remote ?? "",

@@ -70,9 +70,30 @@ export class MockHarnessDriver implements HarnessDriver {
     });
     request.onLine?.("▶ write  .relay-mock-run.txt");
 
-    const markerPath = join(request.cwd, MOCK_MARKER);
+    const lowerTask = request.task.toLowerCase();
     await mkdir(join(request.cwd, ".relay"), { recursive: true }).catch(() => undefined);
-    await writeFile(markerPath, `mock: ${request.task}\n`, "utf8");
+    let touchedPath = MOCK_MARKER;
+    let content = `mock: ${request.task}\n`;
+    if (lowerTask.includes("hello.sh") && lowerTask.includes("hello")) {
+      touchedPath = "hello.sh";
+      content = "#!/usr/bin/env bash\necho hello\n";
+    } else if (lowerTask.includes("add.py") && lowerTask.includes("a+b")) {
+      touchedPath = "add.py";
+      content = "def add(a, b):\n    return a + b\n";
+    } else if (lowerTask.includes("fib.py") && lowerTask.includes("fib")) {
+      touchedPath = "fib.py";
+      content = [
+        "def fib(n):",
+        "    if n < 2:",
+        "        return n",
+        "    a, b = 0, 1",
+        "    for _ in range(2, n + 1):",
+        "        a, b = b, a + b",
+        "    return b",
+        "",
+      ].join("\n");
+    }
+    await writeFile(join(request.cwd, touchedPath), content, "utf8");
 
     this.emit(request, {
       type: "tool_end",
@@ -80,7 +101,7 @@ export class MockHarnessDriver implements HarnessDriver {
       toolName: "write",
       toolCallId: toolId,
       ok: true,
-      output: "wrote mock marker",
+      output: `wrote ${touchedPath}`,
     });
     request.onLine?.("✓ write");
 
@@ -94,7 +115,7 @@ export class MockHarnessDriver implements HarnessDriver {
       summary: "Mock harness completed.",
       output: `Completed: ${request.task}`,
       toolCallCount: 1,
-      ...(writesFiles ? { filesTouched: [MOCK_MARKER] } : {}),
+      ...(writesFiles ? { filesTouched: [touchedPath] } : {}),
     };
   }
 }

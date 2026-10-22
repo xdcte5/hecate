@@ -21,13 +21,19 @@ describe("buildLaunchArgs", () => {
   });
 
   it("runs Codex in full-auto mode", () => {
-    expect(buildLaunchArgs("codex", "do task")).toEqual(["exec", "--full-auto", "do task"]);
+    expect(buildLaunchArgs("codex", "do task")).toEqual([
+      "exec",
+      "--full-auto",
+      "--skip-git-repo-check",
+      "do task",
+    ]);
   });
 
   it("passes model to Codex", () => {
     expect(buildLaunchArgs("codex", "do task", "o4-mini")).toEqual([
       "exec",
       "--full-auto",
+      "--skip-git-repo-check",
       "-m",
       "o4-mini",
       "do task",

@@ -14,6 +14,7 @@ export type RunOptions = {
   advance?: boolean;
   complete?: boolean;
   reset?: boolean;
+  resume?: boolean;
   statusOnly?: boolean;
 };
 
@@ -126,6 +127,7 @@ export async function runOrchestration(options: RunOptions): Promise<RunResult> 
     advance = false,
     complete = false,
     reset = false,
+    resume = false,
     statusOnly = false,
   } = options;
 
@@ -140,7 +142,7 @@ export async function runOrchestration(options: RunOptions): Promise<RunResult> 
     if (!goal) {
       throw new Error("Reset requires a goal: relay run \"<goal>\" --reset");
     }
-    const plan = buildRunPlan(goal, router);
+    const plan = buildRunPlan(goal, router, sessionPolicy);
     const steps: RunStep[] = plan.steps.map((step) => ({
       ...step,
       status: "pending" as const,
@@ -148,7 +150,7 @@ export async function runOrchestration(options: RunOptions): Promise<RunResult> 
     state = initRunState(plan.goal, session.sessionId, steps);
     await saveRunState(cwd, state);
   } else if (goal) {
-    const plan = buildRunPlan(goal, router);
+    const plan = buildRunPlan(goal, router, sessionPolicy);
     const steps: RunStep[] = plan.steps.map((step) => ({
       ...step,
       status: "pending" as const,
@@ -175,6 +177,10 @@ export async function runOrchestration(options: RunOptions): Promise<RunResult> 
       state.currentStepIndex += 1;
     }
     await saveRunState(cwd, state);
+  } else if (resume) {
+    if (!state) {
+      throw new Error("No active run plan. Start with: relay run \"<goal>\"");
+    }
   } else if (!state) {
     throw new Error("No active run plan. Start with: relay run \"<goal>\"");
   }

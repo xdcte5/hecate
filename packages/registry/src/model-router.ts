@@ -9,6 +9,7 @@ export type PiListedModelRef = {
 };
 
 export type RouteModelReason = "ability-match" | "default" | "auth-match";
+export type ModelTier = "capable";
 
 export interface RouteModelResult {
   modelId?: string;
@@ -22,28 +23,58 @@ export type RouteModelOptions = {
   piAuthProviders?: Set<string>;
   /** Models from `pi --list-models` — preferred over static registry for Pi. */
   piListedModels?: PiListedModelRef[];
+  /** Harnesses installed locally — limits blended/heuristic routing candidates. */
+  installedHarnesses?: HarnessId[];
+  /** Prefer stronger models (registry order: last entry) over economical defaults. */
+  modelTier?: ModelTier;
 };
+
+function isEconomicalModelId(modelId: string): boolean {
+  return /\bmini\b/i.test(modelId);
+}
+
+export function modelsForTier<T extends { id: string }>(models: T[], tier?: ModelTier): T[] {
+  if (tier !== "capable") return models;
+  const capable = models.filter((model) => !isEconomicalModelId(model.id));
+  return capable.length > 0 ? capable : models;
+}
+
+export function pickDefaultModelByTier<T extends { id: string }>(models: T[], tier?: ModelTier): T {
+  const pool = modelsForTier(models, tier);
+  return tier === "capable" ? pool[pool.length - 1]! : pool[0]!;
+}
+
+export function shouldDeferToHarnessDefaultModel(harness: HarnessId): boolean {
+  return harness === "codex";
+}
 
 function routePiFromListedModels(
   task: string,
   listed: PiListedModelRef[],
   piAuthProviders?: Set<string>,
+  modelTier?: ModelTier,
 ): RouteModelResult | null {
   let candidates = listed;
   if (piAuthProviders && piAuthProviders.size > 0) {
     const eligible = listed.filter((entry) => isModelProviderAvailable(entry.spec, piAuthProviders));
-    if (eligible.length > 0) candidates = eligible;
+    if (eligible.length === 0) return null;
+    candidates = eligible;
   }
 
   const codex = candidates.filter((entry) => entry.provider === "openai-codex");
   const pool = codex.length > 0 ? codex : candidates;
 
-  const wantsTests = /\b(test|vitest|jest)\b/i.test(task);
+  const wantsTests = modelTier !== "capable" && /\b(test|vitest|jest)\b/i.test(task);
+  const capablePool =
+    modelTier === "capable"
+      ? pool.filter((entry) => !isEconomicalModelId(entry.modelId))
+      : pool;
+  const searchPool = capablePool.length > 0 ? capablePool : pool;
   const picked =
-    (wantsTests ? pool.find((entry) => /mini/i.test(entry.modelId)) : undefined) ??
-    pool.find((entry) => entry.modelId === "gpt-5.4") ??
-    pool.find((entry) => /gpt-5\.[4-9]/.test(entry.modelId)) ??
-    pool[0];
+    (wantsTests ? searchPool.find((entry) => /mini/i.test(entry.modelId)) : undefined) ??
+    searchPool.find((entry) => entry.modelId === "gpt-5.4") ??
+    searchPool.find((entry) => /gpt-5\.[4-9]/.test(entry.modelId)) ??
+    (modelTier === "capable" ? searchPool[searchPool.length - 1] : searchPool[0]);
 
   if (!picked) return null;
 
@@ -61,7 +92,12 @@ export function routeModel(
   options: RouteModelOptions = {},
 ): RouteModelResult {
   if (harness === "pi" && options.piListedModels && options.piListedModels.length > 0) {
-    const listed = routePiFromListedModels(task, options.piListedModels, options.piAuthProviders);
+    const listed = routePiFromListedModels(
+      task,
+      options.piListedModels,
+      options.piAuthProviders,
+      options.modelTier,
+    );
     if (listed) return listed;
   }
 
@@ -82,9 +118,10 @@ export function routeModel(
       authFiltered = eligible.length < allModels.length;
     }
   }
+  models = modelsForTier(models, options.modelTier);
 
   const signals = detectSignals(task);
-  let bestModel = models[0]!;
+  let bestModel = pickDefaultModelByTier(models, options.modelTier);
   let bestScore = Number.NEGATIVE_INFINITY;
   let matched = false;
 
@@ -101,7 +138,9 @@ export function routeModel(
 
   if (!matched || bestScore <= 0) {
     return {
-      modelId: models[0]!.id,
+      modelId: shouldDeferToHarnessDefaultModel(harness)
+        ? undefined
+        : pickDefaultModelByTier(models, options.modelTier).id,
       reason: authFiltered ? "auth-match" : "default",
       score: 0,
       signals: [...signals],
@@ -109,7 +148,7 @@ export function routeModel(
   }
 
   return {
-    modelId: bestModel.id,
+    modelId: shouldDeferToHarnessDefaultModel(harness) ? undefined : bestModel.id,
     reason: "ability-match",
     score: bestScore,
     signals: [...signals],
@@ -122,7 +161,7 @@ export class ModelRouter {
     private readonly options: RouteModelOptions = {},
   ) {}
 
-  routeModel(task: string, harness: HarnessId): RouteModelResult {
-    return routeModel(task, harness, this.registry, this.options);
+  routeModel(task: string, harness: HarnessId, modelTier?: ModelTier): RouteModelResult {
+    return routeModel(task, harness, this.registry, { ...this.options, modelTier });
   }
 }

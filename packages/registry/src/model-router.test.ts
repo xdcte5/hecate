@@ -64,9 +64,9 @@ describe("routeModel", () => {
     });
   });
 
-  it("routes unit tests to o4-mini on codex", () => {
+  it("defers codex automatic model selection to the local CLI default", () => {
     expect(routeModel("write unit tests for auth module", "codex", registry)).toMatchObject({
-      modelId: "o4-mini",
+      modelId: undefined,
       reason: "ability-match",
     });
   });
@@ -83,6 +83,37 @@ describe("routeModel", () => {
       modelId: "composer-2",
       reason: "default",
       score: 0,
+    });
+  });
+
+  it("does not force stale codex capable-tier model ids", () => {
+    expect(routeModel("review code quality", "codex", registry, { modelTier: "capable" })).toMatchObject({
+      modelId: undefined,
+      reason: "default",
+      score: 0,
+    });
+  });
+
+  it("routes capable tier to the strongest registry model on claude-code", () => {
+    expect(routeModel("review the changes", "claude-code", registry, { modelTier: "capable" })).toMatchObject({
+      modelId: "claude-opus-4-6",
+      reason: "default",
+      score: 0,
+    });
+  });
+
+  it("skips mini Pi models when capable tier is requested", () => {
+    expect(
+      routeModel("review authentication module", "pi", registry, {
+        modelTier: "capable",
+        piListedModels: [
+          { provider: "openai-codex", modelId: "gpt-5.4-mini", spec: "openai-codex/gpt-5.4-mini" },
+          { provider: "openai-codex", modelId: "gpt-5.4", spec: "openai-codex/gpt-5.4" },
+        ],
+      }),
+    ).toMatchObject({
+      modelId: "openai-codex/gpt-5.4",
+      reason: "auth-match",
     });
   });
 
@@ -120,6 +151,21 @@ describe("routeModel", () => {
       modelId: "openai-codex/gpt-5.4",
       reason: "auth-match",
     });
+  });
+
+  it("does not pick unauthenticated listed Pi models when auth filter is empty", () => {
+    expect(
+      routeModel("build a thrift shopping website", "pi", registry, {
+        piAuthProviders: new Set(["openai-codex"]),
+        piListedModels: [
+          {
+            provider: "azure-openai-responses",
+            modelId: "gpt-4",
+            spec: "azure-openai-responses/gpt-4",
+          },
+        ],
+      }).modelId,
+    ).not.toBe("azure-openai-responses/gpt-4");
   });
 
   it("returns undefined when harness has no models configured", () => {

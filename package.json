@@ -9,6 +9,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
+    "test:live-e2e": "pnpm --filter @relay/orchestrator test:live-e2e",
     "typecheck": "pnpm -r typecheck"
   }
 }

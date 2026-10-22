@@ -1,0 +1,53 @@
+version: "1"
+updated: "2026-07-14"
+sources:
+  - web-extracted
+
+task_types:
+  implement:
+    codex/o4-mini: 0.82
+    pi/openai-codex/gpt-5.4: 0.80
+    cursor/composer-2: 0.74
+    claude-code/claude-sonnet-4-6: 0.68
+  implement-frontend:
+    cursor/composer-2: 0.88
+    claude-code/claude-sonnet-4-6: 0.82
+    pi/openai-codex/gpt-5.4: 0.75
+    codex/o3: 0.70
+  implement-backend:
+    codex/o3: 0.82
+    pi/openai-codex/gpt-5.4: 0.80
+    claude-code/claude-sonnet-4-6: 0.78
+    cursor/composer-2: 0.72
+  fix:
+    claude-code/claude-opus-4-6: 0.90
+    cursor/composer-2: 0.75
+    claude-code/claude-sonnet-4-6: 0.78
+    codex/o3: 0.72
+    pi/openai-codex/gpt-5.4: 0.70
+  refactor:
+    claude-code/claude-opus-4-6: 0.92
+    claude-code/claude-sonnet-4-6: 0.80
+    codex/o3: 0.68
+    pi/openai-codex/gpt-5.4: 0.65
+  test:
+    codex/o4-mini: 0.88
+    pi/openai-codex/gpt-5.4-mini: 0.82
+    claude-code/claude-sonnet-4-6: 0.72
+    cursor/composer-2: 0.65
+  review:
+    claude-code/claude-opus-4-6: 0.85
+    claude-code/claude-sonnet-4-6: 0.80
+    codex/o3: 0.70
+    pi/openai-codex/gpt-5.4: 0.68
+
+signal_adjustments:
+  - signal: frontend
+    adjustment: 0.08
+    target: cursor
+  - signal: test
+    adjustment: 0.10
+    target: codex/o4-mini
+  - signal: script
+    adjustment: 0.08
+    target: pi

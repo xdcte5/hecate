@@ -1,25 +1,20 @@
 import { Command } from "commander";
 import { readEvents, SessionStore } from "@relay/session";
 import { gateProFeature } from "../pro-gate.js";
-
-function formatKeyFields(event: Record<string, unknown>): string {
-  const skip = new Set(["at", "event"]);
-  return Object.entries(event)
-    .filter(([key]) => !skip.has(key))
-    .map(([key, value]) => {
-      const rendered = typeof value === "string" ? value : JSON.stringify(value);
-      return `${key}=${rendered}`;
-    })
-    .join(" ");
-}
+import {
+  buildTraceAudit,
+  formatTraceHuman,
+  formatTraceJson,
+} from "./trace-format.js";
 
 export function registerTraceCommands(program: Command, getCwd: () => string): void {
   program
     .command("trace")
-    .description("Show session event timeline")
+    .description("Show session event timeline grouped by routing hops")
     .argument("[session-id]", "Session id (defaults to active session)")
+    .option("--json", "Export grouped hop audit as JSON")
     .option("--otel", "Pro: export trace as OpenTelemetry (coming in v0.2)")
-    .action(async (sessionId: string | undefined, options: { otel?: boolean }) => {
+    .action(async (sessionId: string | undefined, options: { json?: boolean; otel?: boolean }) => {
       gateProFeature("OTel trace export (--otel)", Boolean(options.otel));
       const cwd = getCwd();
       const store = new SessionStore({ rootDir: cwd });
@@ -34,15 +29,13 @@ export function registerTraceCommands(program: Command, getCwd: () => string): v
       }
 
       const events = await readEvents(cwd, id);
-      console.log(`Session: ${id}`);
-      console.log(`Events: ${events.length}`);
-      console.log("");
+      const audit = buildTraceAudit(id, events);
 
-      for (const event of events) {
-        const at = typeof event.at === "string" ? event.at : "?";
-        const type = typeof event.event === "string" ? event.event : "?";
-        const fields = formatKeyFields(event);
-        console.log(`${at}  ${type}${fields ? `  ${fields}` : ""}`);
+      if (options.json) {
+        console.log(formatTraceJson(audit));
+        return;
       }
+
+      console.log(formatTraceHuman(audit));
     });
 }

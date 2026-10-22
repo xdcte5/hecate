@@ -15,8 +15,8 @@ export function filterEnabledAgents(
 
 /**
  * Merge user-enabled agents with currently installed harnesses.
- * Drops agents whose CLIs disappeared and adds newly detected installs
- * (e.g. pi on an nvm version bin that was missing from PATH at first scan).
+ * Drops agents whose CLIs disappeared. A non-empty enabled list is authoritative:
+ * do not add installed harnesses the user did not select.
  */
 export function syncEnabledAgentsWithInstalled(
   enabledAgents: HarnessId[],
@@ -30,11 +30,7 @@ export function syncEnabledAgentsWithInstalled(
   }
 
   const kept = enabledAgents.filter((id) => installed.has(id));
-  const merged = new Set(kept);
-  for (const id of failover) {
-    if (installed.has(id)) merged.add(id);
-  }
-
-  const ordered = failover.filter((id) => merged.has(id));
-  return ordered.length > 0 ? ordered : failover.filter((id) => installed.has(id));
+  const ordered = failover.filter((id) => kept.includes(id));
+  const extras = kept.filter((id) => !ordered.includes(id));
+  return [...ordered, ...extras];
 }

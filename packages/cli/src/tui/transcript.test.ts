@@ -82,6 +82,15 @@ describe("transcript", () => {
     expect(done?.text).toContain("Pi finished.");
 
     expect(classifyHarnessEvent({ type: "plan", at, steps: [] })).toBe("plan");
+    expect(
+      renderHarnessEvent({
+        type: "usage",
+        at,
+        inputTokens: 100,
+        outputTokens: 20,
+        costUsd: 0.01,
+      }).lines,
+    ).toEqual([]);
   });
 
   it("routes plan and error events to message components", () => {
@@ -104,6 +113,47 @@ describe("transcript", () => {
     });
     expect(err[0]).toContain("build failed");
     expect(err[0]).toContain("verify");
+  });
+
+  it("renders graph verifier node outcomes in the transcript", () => {
+    const pass = renderHarnessEvent({
+      type: "graph_node",
+      at,
+      stepId: "implement",
+      nodeId: "artifact-check",
+      nodeType: "artifact",
+      ok: true,
+      durationMs: 23,
+      evidence: "Validated dist output.",
+    });
+    expect(pass.entries[0]?.kind).toBe("success");
+    expect(pass.lines[0]).toContain("graph");
+    expect(pass.lines[0]).toContain("PASS artifact-check");
+    expect(pass.lines[0]).toContain("artifact");
+    expect(pass.lines[0]).toContain("23ms");
+    expect(pass.lines[0]).toContain("Validated dist output.");
+
+    const fail = renderHarnessEvent({
+      type: "graph_node",
+      at,
+      stepId: "implement",
+      nodeId: "policy-check",
+      nodeType: "policy",
+      ok: false,
+      durationMs: 5,
+    });
+    expect(fail.entries[0]?.kind).toBe("error");
+    expect(
+      formatHarnessEvent({
+        type: "graph_node",
+        at,
+        stepId: "implement",
+        nodeId: "policy-check",
+        nodeType: "policy",
+        ok: false,
+        durationMs: 5,
+      }),
+    ).toBe("graph FAIL policy-check (policy, 5ms)");
   });
 
   it("toggles tool block expand state in context", () => {

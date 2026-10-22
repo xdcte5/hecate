@@ -106,6 +106,10 @@ export function classifyHarnessEvent(event: HarnessEvent): TranscriptKind {
       return "agent";
     case "step_end":
       return event.ok ? "success" : "error";
+    case "verify_outcome":
+      return event.ok ? "success" : "error";
+    case "graph_node":
+      return event.ok ? "success" : "error";
     case "tool_start":
     case "tool_end":
       return "tool";
@@ -115,6 +119,7 @@ export function classifyHarnessEvent(event: HarnessEvent): TranscriptKind {
     case "retry_start":
     case "retry_end":
     case "agent_end":
+    case "usage":
       return "info";
   }
 }
@@ -193,6 +198,18 @@ export function renderHarnessEvent(
     case "step_end":
       push(classifyHarnessEvent(event), formatStepEndEvent(event));
       break;
+    case "verify_outcome":
+      push(
+        classifyHarnessEvent(event),
+        `${ANSI.dim}verify${ANSI.reset} ${ANSI.bold}›${ANSI.reset} ${event.ok ? "PASS" : "FAIL"} ${event.verifierId}: ${event.evidence}`,
+      );
+      break;
+    case "graph_node":
+      push(
+        classifyHarnessEvent(event),
+        `${ANSI.dim}graph${ANSI.reset} ${ANSI.bold}›${ANSI.reset} ${event.ok ? "PASS" : "FAIL"} ${event.nodeId} (${event.nodeType}, ${event.durationMs}ms)${event.evidence ? `: ${event.evidence}` : ""}`,
+      );
+      break;
     case "agent_start":
       push("agent", `${ANSI.yellow}agent${ANSI.reset} ${ANSI.bold}›${ANSI.reset} agent started`);
       break;
@@ -221,6 +238,8 @@ export function renderHarnessEvent(
           ? `${ANSI.dim}relay${ANSI.reset} ${ANSI.bold}›${ANSI.reset} retry failed`
           : `${ANSI.dim}relay${ANSI.reset} ${ANSI.bold}›${ANSI.reset} retry done`,
       );
+      break;
+    case "usage":
       break;
     default:
       break;
@@ -286,6 +305,12 @@ export function formatHarnessEvent(event: HarnessEvent): string | null {
       return `retrying…${event.reason ? ` (${event.reason})` : ""}`;
     case "retry_end":
       return event.ok === false ? "retry failed" : "retry done";
+    case "verify_outcome":
+      return `verify ${event.ok ? "PASS" : "FAIL"} ${event.verifierId}: ${event.evidence}`;
+    case "graph_node":
+      return `graph ${event.ok ? "PASS" : "FAIL"} ${event.nodeId} (${event.nodeType}, ${event.durationMs}ms)${event.evidence ? `: ${event.evidence}` : ""}`;
+    default:
+      return null;
   }
 }
 

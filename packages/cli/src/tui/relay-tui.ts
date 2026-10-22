@@ -5,7 +5,7 @@ import { getPromptStatus, processPrompt, createSteerQueue } from "@relay/orchest
 import type { HarnessEvent, HarnessId, ToolEndEvent } from "@relay/schema";
 import { SessionStore } from "@relay/session";
 import { scanLocalAgents, promptAgentSelection } from "./agent-picker.js";
-import { detectGitBranch, renderFooter, type FooterState } from "./footer.js";
+import { detectGitBranch, renderFooter, createUsageTracker, type FooterState } from "./footer.js";
 import {
   readLocalConfig,
   writeLocalConfig,
@@ -51,6 +51,9 @@ type RuntimeState = {
   step?: number;
   totalSteps?: number;
   contextPct?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  costUsd?: number;
 };
 
 /**
@@ -87,6 +90,7 @@ export async function runRelayTui(options: RelayTuiOptions): Promise<void> {
   }
 
   let runtime: RuntimeState = {};
+  const usageTracker = createUsageTracker();
   const session = await new SessionStore({ rootDir: cwd }).getActive();
   runtime.goal = session?.goal;
 
@@ -117,6 +121,9 @@ export async function runRelayTui(options: RelayTuiOptions): Promise<void> {
       step: runtime.step,
       totalSteps: runtime.totalSteps,
       contextPct: runtime.contextPct,
+      inputTokens: runtime.inputTokens,
+      outputTokens: runtime.outputTokens,
+      costUsd: runtime.costUsd,
       gitBranch,
       width: screen.size.cols,
     };
@@ -210,7 +217,7 @@ export async function runRelayTui(options: RelayTuiOptions): Promise<void> {
         event,
       });
     }
-    updateRuntimeFromEvent(event, runtime);
+    updateRuntimeFromEvent(event, runtime, usageTracker);
     repaint();
   };
 
@@ -441,6 +448,8 @@ export async function runRelayTui(options: RelayTuiOptions): Promise<void> {
       abortController = new AbortController();
       rl.pause();
       runtime = { ...runtime, goal: trimmed };
+      usageTracker.resetSession();
+      applyUsageToRuntime(runtime, usageTracker.getDisplay());
 
       const harnessOverride = localConfig.harnessOverride;
       const nextModelOverride = localConfig.nextModelOverride;
@@ -508,14 +517,32 @@ function updateRuntimeFromLine(line: string, runtime: RuntimeState): void {
   }
 }
 
-function updateRuntimeFromEvent(event: HarnessEvent, runtime: RuntimeState): void {
+function applyUsageToRuntime(
+  runtime: RuntimeState,
+  usage: { inputTokens?: number; outputTokens?: number; costUsd?: number },
+): void {
+  runtime.inputTokens = usage.inputTokens;
+  runtime.outputTokens = usage.outputTokens;
+  runtime.costUsd = usage.costUsd;
+}
+
+function updateRuntimeFromEvent(
+  event: HarnessEvent,
+  runtime: RuntimeState,
+  usageTracker: ReturnType<typeof createUsageTracker>,
+): void {
   switch (event.type) {
+    case "usage":
+      applyUsageToRuntime(runtime, usageTracker.onUsage(event));
+      break;
     case "step_start":
+      usageTracker.onStepStart();
       runtime.harness = event.harness;
       if (event.stepIndex !== undefined) runtime.step = event.stepIndex + 1;
       if (event.totalSteps !== undefined) runtime.totalSteps = event.totalSteps;
       break;
     case "step_end":
+      applyUsageToRuntime(runtime, usageTracker.onStepEnd());
       runtime.harness = event.harness;
       break;
     case "agent_start":

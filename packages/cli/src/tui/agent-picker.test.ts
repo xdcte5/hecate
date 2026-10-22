@@ -62,18 +62,22 @@ describe("agent-picker", () => {
         label: "Pi",
         binaries: ["pi"],
         installed: true,
+        runnable: false,
         installedBinary: "pi",
+        issue: "auth needed",
       },
       {
         id: "codex" as const,
         label: "Codex",
         binaries: ["codex"],
         installed: false,
+        runnable: false,
       },
     ];
     const lines = formatAgentScanList(scan, ["pi"]);
     expect(lines[0]).toContain("[x]");
     expect(lines[0]).toContain("Pi");
+    expect(lines[0]).toContain("auth needed");
     expect(lines[1]).toContain("[ ]");
     expect(lines[1]).toContain("✗");
   });

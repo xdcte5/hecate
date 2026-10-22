@@ -11,6 +11,7 @@ export function registerRunCommands(program: Command, getCwd: () => string): voi
     .option("--next", "Advance to the next step (current step must be done)")
     .option("--complete", "Mark the current step as done")
     .option("--reset", "Reset the run plan for the goal")
+    .option("--resume", "Resume the current unfinished step from durable run state")
     .option("--status", "Show the current run plan")
     .action(async (goal: string | undefined, options: {
       launch?: boolean;
@@ -18,18 +19,20 @@ export function registerRunCommands(program: Command, getCwd: () => string): voi
       next?: boolean;
       complete?: boolean;
       reset?: boolean;
+      resume?: boolean;
       status?: boolean;
     }) => {
-      const mode = options.launch ? "launch" : options.clipboard ? "clipboard" : "dry-run";
+      const mode = options.launch || options.resume ? "launch" : options.clipboard ? "clipboard" : "dry-run";
 
       const result = await runOrchestration({
         cwd: getCwd(),
         goal: goal?.trim() || undefined,
         mode,
-        interactive: Boolean(options.launch),
+        interactive: Boolean(options.launch || options.resume),
         advance: Boolean(options.next),
         complete: Boolean(options.complete),
         reset: Boolean(options.reset),
+        resume: Boolean(options.resume),
         statusOnly: Boolean(options.status),
       });
 

@@ -45,11 +45,76 @@ export type FooterState = {
   step?: number;
   totalSteps?: number;
   contextPct?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  costUsd?: number;
   gitBranch?: string;
   cwd: string;
   goal?: string;
   width?: number;
 };
+
+/** Compact token count for footer (Pi-like: 12.4k, 1.2M). */
+export function formatTokenCount(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
+  if (tokens >= 10_000) return `${Math.round(tokens / 1000)}k`;
+  if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}k`;
+  return String(tokens);
+}
+
+/** Compact USD cost for footer. */
+export function formatCostUsd(usd: number): string {
+  if (usd >= 1) return `$${usd.toFixed(2)}`;
+  if (usd >= 0.01) return `$${usd.toFixed(3)}`;
+  return `$${usd.toFixed(4)}`;
+}
+
+export type UsageSnapshot = {
+  inputTokens?: number;
+  outputTokens?: number;
+  costUsd?: number;
+};
+
+export function addUsageTotals(base: UsageSnapshot, add: UsageSnapshot): UsageSnapshot {
+  const inputTokens = (base.inputTokens ?? 0) + (add.inputTokens ?? 0);
+  const outputTokens = (base.outputTokens ?? 0) + (add.outputTokens ?? 0);
+  const costUsd = (base.costUsd ?? 0) + (add.costUsd ?? 0);
+  return {
+    ...(inputTokens > 0 ? { inputTokens } : {}),
+    ...(outputTokens > 0 ? { outputTokens } : {}),
+    ...(costUsd > 0 ? { costUsd } : {}),
+  };
+}
+
+/** Track cumulative session usage across multi-step plans. */
+export function createUsageTracker() {
+  let session: UsageSnapshot = {};
+  let step: UsageSnapshot = {};
+
+  return {
+    resetSession(): void {
+      session = {};
+      step = {};
+    },
+    onStepStart(): void {
+      step = {};
+    },
+    onUsage(event: UsageSnapshot): UsageSnapshot {
+      if (event.inputTokens !== undefined) step.inputTokens = event.inputTokens;
+      if (event.outputTokens !== undefined) step.outputTokens = event.outputTokens;
+      if (event.costUsd !== undefined) step.costUsd = event.costUsd;
+      return addUsageTotals(session, step);
+    },
+    onStepEnd(): UsageSnapshot {
+      session = addUsageTotals(session, step);
+      step = {};
+      return session;
+    },
+    getDisplay(): UsageSnapshot {
+      return addUsageTotals(session, step);
+    },
+  };
+}
 
 export function detectGitBranch(cwd: string): string | undefined {
   try {
@@ -87,6 +152,18 @@ export function renderFooter(state: FooterState): string {
       ? `${ANSI.dim}ctx${ANSI.reset} ${state.contextPct}%`
       : null;
 
+  const usageParts: string[] = [];
+  if (state.inputTokens !== undefined) {
+    usageParts.push(`${ANSI.dim}↑${ANSI.reset}${formatTokenCount(state.inputTokens)}`);
+  }
+  if (state.outputTokens !== undefined) {
+    usageParts.push(`${ANSI.dim}↓${ANSI.reset}${formatTokenCount(state.outputTokens)}`);
+  }
+  if (state.costUsd !== undefined) {
+    usageParts.push(`${ANSI.green}${formatCostUsd(state.costUsd)}${ANSI.reset}`);
+  }
+  const usageText = usageParts.length > 0 ? usageParts.join(" ") : null;
+
   const cwd = basename(state.cwd);
   const branch = state.gitBranch;
   const pathText = branch
@@ -99,6 +176,7 @@ export function renderFooter(state: FooterState): string {
     `${ANSI.dim}model${ANSI.reset} ${model}`,
     stepText,
     ...(ctxText ? [ctxText] : []),
+    ...(usageText ? [usageText] : []),
     `${ANSI.dim}cwd${ANSI.reset} ${pathText}`,
   ];
   const body = segments.join(` ${ANSI.dim}·${ANSI.reset} `);
@@ -108,6 +186,9 @@ export function renderFooter(state: FooterState): string {
     (state.modelMode === "auto" || !state.model ? 4 : (state.model?.length ?? 4)) +
     (state.step !== undefined ? 8 : 4) +
     (state.contextPct !== undefined ? 8 : 0) +
+    (state.inputTokens !== undefined ? formatTokenCount(state.inputTokens).length + 1 : 0) +
+    (state.outputTokens !== undefined ? formatTokenCount(state.outputTokens).length + 1 : 0) +
+    (state.costUsd !== undefined ? formatCostUsd(state.costUsd).length : 0) +
     cwd.length +
     (branch ? branch.length + 1 : 0) +
     24;

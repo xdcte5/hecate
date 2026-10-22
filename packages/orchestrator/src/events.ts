@@ -174,6 +174,10 @@ export function formatHarnessEventLine(event: HarnessEvent): string | null {
       return "retrying…";
     case "retry_end":
       return event.ok === false ? "retry failed" : "retry done";
+    case "verify_outcome":
+      return `verify ${event.ok ? "PASS" : "FAIL"} ${event.verifierId}: ${event.evidence}`;
+    case "graph_node":
+      return `graph ${event.ok ? "PASS" : "FAIL"} ${event.nodeId} (${event.nodeType}, ${event.durationMs}ms)${event.evidence ? `: ${event.evidence}` : ""}`;
     case "error":
       return `error: ${event.message}`;
     case "plan": {
@@ -185,6 +189,8 @@ export function formatHarnessEventLine(event: HarnessEvent): string | null {
       return event.from
         ? `handoff: ${event.from} → ${event.to}`
         : `handoff → ${event.to}`;
+    case "usage":
+      return null;
     default:
       return null;
   }
@@ -247,5 +253,19 @@ export function makeErrorEvent(message: string, code?: string): HarnessEvent {
     at: now(),
     message,
     ...(code ? { code } : {}),
+  };
+}
+
+export function makeUsageEvent(usage: {
+  inputTokens?: number;
+  outputTokens?: number;
+  costUsd?: number;
+}): HarnessEvent {
+  return {
+    type: "usage",
+    at: now(),
+    ...(usage.inputTokens !== undefined ? { inputTokens: usage.inputTokens } : {}),
+    ...(usage.outputTokens !== undefined ? { outputTokens: usage.outputTokens } : {}),
+    ...(usage.costUsd !== undefined ? { costUsd: usage.costUsd } : {}),
   };
 }

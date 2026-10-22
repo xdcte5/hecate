@@ -1,16 +1,23 @@
 import { loadRelayConfig } from "@relay/registry";
 import type { HarnessId, Registry } from "@relay/schema";
+import type { HarnessEligibilityContext } from "./harness-eligibility.js";
+import { isHarnessRunnable } from "./harness-eligibility.js";
 import { resolveHarnessBinary } from "./resolve-binary.js";
 
 export async function resolveHarnessWithFallback(
   registry: Registry,
   preferred: HarnessId,
   failover: HarnessId[],
+  eligibility?: HarnessEligibilityContext,
 ): Promise<{ harness: HarnessId; binary: string; fallback: boolean; skipped: HarnessId[] } | null> {
   const order = [preferred, ...failover.filter((h) => h !== preferred)];
   const skipped: HarnessId[] = [];
 
   for (const harness of order) {
+    if (eligibility && !isHarnessRunnable(harness, eligibility)) {
+      skipped.push(harness);
+      continue;
+    }
     const binary = await resolveHarnessBinary(registry, harness);
     if (binary) {
       return { harness, binary, fallback: harness !== preferred, skipped };

@@ -1,10 +1,11 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { installMcpHarnessConfigs, RELAY_MCP_CANONICAL_PATH } from "@relay/adapters";
 import type { HarnessEvent } from "@relay/schema";
 import type { HarnessDriver, DriverRequest, HarnessRunResult } from "./types.js";
 import { buildAgentPrompt } from "../launch-args.js";
-import { mapPiEventToHarnessEvent, HarnessEventEmitter, type PiRpcEvent } from "../events.js";
+import { mapPiEventToHarnessEvent, HarnessEventEmitter, makeUsageEvent, type PiRpcEvent } from "../events.js";
 import {
   buildPiSkillsEnv,
   formatSkillPromptSection,
@@ -14,6 +15,13 @@ import {
 import type { SteerQueue } from "../steer-queue.js";
 import { listChangedFiles } from "../verify.js";
 import { attachJsonlLineReader, serializeJsonLine } from "./jsonl.js";
+import {
+  accumulateUsage,
+  parseUsageFromPiEvent,
+  parseUsageFromSessionStats,
+  usageFields,
+  type StreamUsage,
+} from "./streaming-cli.js";
 
 function cleanEnv(): NodeJS.ProcessEnv {
   return {
@@ -51,11 +59,26 @@ function buildPrompt(
 }
 
 function resolveMcpConfigPath(cwd: string): string | undefined {
-  const relayMcp = join(cwd, "relay", "mcp.json");
+  const relayMcp = join(cwd, RELAY_MCP_CANONICAL_PATH);
   if (existsSync(relayMcp)) return relayMcp;
   const rootMcp = join(cwd, "mcp.json");
   if (existsSync(rootMcp)) return rootMcp;
   return undefined;
+}
+
+async function autoInstallMcpConfigs(
+  cwd: string,
+  onWarning?: (message: string) => void,
+): Promise<void> {
+  const relayMcp = join(cwd, RELAY_MCP_CANONICAL_PATH);
+  if (!existsSync(relayMcp)) return;
+
+  try {
+    await installMcpHarnessConfigs(cwd);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    onWarning?.(`MCP auto-install failed: ${message}`);
+  }
 }
 
 /** Send abort RPC command when the run is cancelled. */
@@ -92,6 +115,11 @@ export class PiRpcDriver implements HarnessDriver {
   }
 
   async run(request: DriverRequest): Promise<HarnessRunResult> {
+    await autoInstallMcpConfigs(request.cwd, (message) => {
+      request.onLine?.(`⚠ ${message}`);
+      console.warn(message);
+    });
+
     const skills = await loadRelaySkills(request.cwd);
     const skillsSection = formatSkillsCatalog(skills);
     const skillSection = formatSkillPromptSection(skills, request.activeSkill);
@@ -108,6 +136,7 @@ export class PiRpcDriver implements HarnessDriver {
       let agentSettled = false;
       let runError: string | null = null;
       let toolCallCount = 0;
+      let usage: StreamUsage = {};
       let promptSent = false;
       const pending = new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
       let reqId = 0;
@@ -145,6 +174,48 @@ export class PiRpcDriver implements HarnessDriver {
           }
           resolve(result);
         })();
+      };
+
+      const finishFromAgentSettled = (authoritativeUsage?: StreamUsage) => {
+        const finalUsage = authoritativeUsage ?? usage;
+        const usageResult = usageFields(finalUsage);
+        if (runError) {
+          finish({
+            ok: false,
+            harness: request.harness,
+            summary: runError,
+            output: lastAssistant?.split("\n").slice(-4).join("\n") || stderr.trim() || undefined,
+            ...usageResult,
+          });
+          return;
+        }
+        finish({
+          ok: true,
+          harness: request.harness,
+          summary: "Pi finished.",
+          output: lastAssistant?.split("\n").slice(-4).join("\n") || undefined,
+          ...usageResult,
+        });
+      };
+
+      const requestSessionStats = () => {
+        if (!writeCommand) {
+          finishFromAgentSettled();
+          return;
+        }
+        const statsId = writeCommand({ type: "get_session_stats" });
+        pending.set(statsId, {
+          resolve: (response) => {
+            const statsUsage = parseUsageFromSessionStats(response as Record<string, unknown>);
+            if (statsUsage) {
+              emitHarnessEvent(request, makeUsageEvent(statsUsage), this.emitter);
+            }
+            finishFromAgentSettled(statsUsage ?? undefined);
+          },
+          reject: () => {
+            finishFromAgentSettled();
+          },
+        });
       };
 
       const child: ChildProcess = spawn(
@@ -257,6 +328,12 @@ export class PiRpcDriver implements HarnessDriver {
         }
 
         if (parsed.type === "message_end") {
+          const parsedUsage = parseUsageFromPiEvent(parsed);
+          if (parsedUsage) {
+            usage = accumulateUsage(usage, parsedUsage);
+            emitHarnessEvent(request, makeUsageEvent(usage), this.emitter);
+          }
+
           const message = parsed.message as { role?: string; content?: Array<{ type?: string; text?: string }> } | undefined;
           if (message?.role === "assistant") {
             const text = message.content
@@ -269,21 +346,8 @@ export class PiRpcDriver implements HarnessDriver {
 
         if (parsed.type === "agent_settled") {
           agentSettled = true;
-          if (runError) {
-            finish({
-              ok: false,
-              harness: request.harness,
-              summary: runError,
-              output: lastAssistant?.split("\n").slice(-4).join("\n") || stderr.trim() || undefined,
-            });
-            return;
-          }
-          finish({
-            ok: true,
-            harness: request.harness,
-            summary: "Pi finished.",
-            output: lastAssistant?.split("\n").slice(-4).join("\n") || undefined,
-          });
+          requestSessionStats();
+          return;
         }
       };
 
@@ -301,9 +365,12 @@ export class PiRpcDriver implements HarnessDriver {
             const pendingReq = pending.get(id);
             if (pendingReq) {
               pending.delete(id);
+              const command = typeof parsed.command === "string" ? parsed.command : "";
               if (parsed.success === false) {
-                runError = String(parsed.error ?? "Pi RPC error");
-                pendingReq.reject(new Error(runError));
+                if (command !== "get_session_stats") {
+                  runError = String(parsed.error ?? "Pi RPC error");
+                }
+                pendingReq.reject(new Error(String(parsed.error ?? "Pi RPC error")));
               } else {
                 pendingReq.resolve(parsed);
               }

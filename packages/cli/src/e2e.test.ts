@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { cpSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import os from "node:os";
 import { join } from "node:path";
@@ -18,6 +18,10 @@ afterEach(() => {
 
 function run(cwd: string, args: string[]): string {
   return execFileSync("node", [cli, ...args], { cwd, encoding: "utf8" });
+}
+
+function runResult(cwd: string, args: string[]) {
+  return spawnSync("node", [cli, ...args], { cwd, encoding: "utf8" });
 }
 function git(cwd: string, args: string[]): void {
   execFileSync("git", args, { cwd, stdio: "pipe" });
@@ -63,4 +67,16 @@ describe("E2E: session → build → inject → doctor → handoff (both tracks)
     expect(run(tmp, ["build", "--all"])).toContain("tracked harness");
     expect(run(tmp, ["doctor"])).toContain("no generated-file drift");
   }, 15_000);
+});
+
+describe("E2E: run resume command", () => {
+  it("accepts --resume as a first-class run option", () => {
+    tmp = mkdtempSync(join(os.tmpdir(), "relay-e2e-resume-"));
+    cpSync(fixtureRelay, join(tmp, "relay"), { recursive: true });
+
+    const result = runResult(tmp, ["run", "--resume"]);
+
+    expect(result.stderr).not.toContain("unknown option '--resume'");
+    expect(result.stdout + result.stderr).toContain("No active run plan");
+  });
 });

@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
+import { GraphNodeEventSchema } from "./index.js";
 import { HarnessEventSchema, type HarnessEvent } from "./harness-event.js";
 
 const at = "2026-07-14T09:00:00.000Z";
+
+const graphNodeEvent = {
+  type: "graph_node",
+  at,
+  stepId: "step_1",
+  nodeId: "verify_artifact",
+  nodeType: "artifact_check",
+  ok: true,
+  durationMs: 17,
+  evidence: "Found expected file changes.",
+} satisfies HarnessEvent;
 
 const fixtures: HarnessEvent[] = [
   {
@@ -58,6 +70,8 @@ const fixtures: HarnessEvent[] = [
   { type: "handoff", at, from: "pi", to: "codex", handoffSeq: 1 },
   { type: "retry_start", at, reason: "rate limit" },
   { type: "retry_end", at, ok: true },
+  { type: "usage", at, inputTokens: 12_450, outputTokens: 890, costUsd: 0.0342 },
+  graphNodeEvent,
 ];
 
 describe("HarnessEventSchema", () => {
@@ -87,6 +101,22 @@ describe("HarnessEventSchema", () => {
         type: "plan",
         at,
         steps: [{ id: "s1", task: "x", harness: "unknown", wave: 0 }],
+      }),
+    ).toThrow();
+  });
+
+  it("exports graph node schema and validates duration", () => {
+    expect(GraphNodeEventSchema.parse(graphNodeEvent)).toEqual(graphNodeEvent);
+
+    expect(() =>
+      GraphNodeEventSchema.parse({
+        type: "graph_node",
+        at,
+        stepId: "step_1",
+        nodeId: "verify_artifact",
+        nodeType: "artifact_check",
+        ok: false,
+        durationMs: -1,
       }),
     ).toThrow();
   });

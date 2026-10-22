@@ -61,5 +61,7 @@ describe("applyFailoverRetry", () => {
     expect(step.finishedAt).toBeUndefined();
     expect(step.result).toBeUndefined();
     expect(step.binary).toBeUndefined();
+    expect(step.model).toBeUndefined();
+    expect(step.modelReason).toBeUndefined();
   });
 });

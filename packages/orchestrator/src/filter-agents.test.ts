@@ -28,23 +28,23 @@ describe("syncEnabledAgentsWithInstalled", () => {
     ]);
   });
 
-  it("adds newly installed agents from failover order", () => {
+  it("does not add installed agents outside an explicit enabled list", () => {
     expect(
       syncEnabledAgentsWithInstalled(["claude-code"], ["pi", "claude-code"], [...failover]),
-    ).toEqual(["pi", "claude-code"]);
+    ).toEqual(["claude-code"]);
   });
 
   it("drops enabled agents whose CLIs are no longer installed", () => {
     expect(syncEnabledAgentsWithInstalled(["pi", "codex"], ["pi"], [...failover])).toEqual(["pi"]);
   });
 
-  it("preserves failover ordering", () => {
+  it("preserves failover ordering for explicitly enabled installed agents", () => {
     expect(
       syncEnabledAgentsWithInstalled(
         ["claude-code", "codex"],
         ["pi", "claude-code", "codex"],
         [...failover],
       ),
-    ).toEqual(["pi", "claude-code", "codex"]);
+    ).toEqual(["claude-code", "codex"]);
   });
 });

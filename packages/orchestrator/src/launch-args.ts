@@ -17,16 +17,24 @@ export function buildAgentPrompt(task: string, handoffPath: string, autonomous =
   return lines.join("\n");
 }
 
+function captureUsage(): boolean {
+  return process.env.RELAY_CAPTURE_USAGE === "1";
+}
+
 export function buildLaunchArgs(harness: HarnessId, prompt: string, model?: string): string[] {
   switch (harness) {
     case "claude-code": {
-      const args = ["-p", "--dangerously-skip-permissions"];
+      const args = captureUsage()
+        ? ["-p", "--verbose", "--permission-mode", "bypassPermissions", "--output-format", "stream-json", "--max-turns", "8"]
+        : ["-p", "--dangerously-skip-permissions"];
       if (model) args.push("--model", model);
       args.push(prompt);
       return args;
     }
     case "codex": {
-      const args = ["exec", "--full-auto"];
+      const args = captureUsage()
+        ? ["exec", "--json", "--sandbox", "workspace-write", "--skip-git-repo-check"]
+        : ["exec", "--full-auto", "--skip-git-repo-check"];
       if (model) args.push("-m", model);
       args.push(prompt);
       return args;

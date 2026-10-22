@@ -17,6 +17,9 @@ const successFixture: HarnessResult = {
   ],
   durationMs: 42_500,
   toolCallCount: 12,
+  inputTokens: 12_450,
+  outputTokens: 890,
+  costUsd: 0.0342,
 };
 
 const failureFixture: HarnessResult = {
@@ -50,6 +53,28 @@ describe("HarnessResultSchema", () => {
   it("rejects negative toolCallCount", () => {
     expect(() =>
       HarnessResultSchema.parse({ ...successFixture, toolCallCount: -1 }),
+    ).toThrow();
+  });
+
+  it("parses optional usage fields", () => {
+    const withUsage = {
+      ...successFixture,
+      inputTokens: 100,
+      outputTokens: 50,
+      costUsd: 0.01,
+    };
+    expect(HarnessResultSchema.parse(withUsage)).toEqual(withUsage);
+  });
+
+  it("rejects negative inputTokens", () => {
+    expect(() =>
+      HarnessResultSchema.parse({ ...successFixture, inputTokens: -1 }),
+    ).toThrow();
+  });
+
+  it("rejects negative costUsd", () => {
+    expect(() =>
+      HarnessResultSchema.parse({ ...successFixture, costUsd: -0.01 }),
     ).toThrow();
   });
 });

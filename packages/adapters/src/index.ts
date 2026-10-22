@@ -51,6 +51,14 @@ export {
 } from "./manifest.js";
 
 export { isBinaryInstalled, detectInstalledBinaries, resolveBinaryPath } from "./detect.js";
+export {
+  MCP_INSTALL_TARGETS,
+  RELAY_MCP_CANONICAL_PATH,
+  readCanonicalMcp,
+  withRelayServer,
+  installMcpHarnessConfigs,
+  type McpInstallResult,
+} from "./mcp-install.js";
 export { detectPiAuthProviders } from "./pi-auth.js";
 export type { PiProviderId } from "./pi-auth.js";
 export {

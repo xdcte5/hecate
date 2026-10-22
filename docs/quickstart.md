@@ -73,6 +73,7 @@ Open the target harness — its instruction file already points at the session's
 
 ```bash
 relay doctor            # generated files match relay.lock (no drift)
+relay doctor --routing    # blended routing config, priors, and local stats
 relay trace             # every handoff hop, from events.jsonl
 ```
 
@@ -110,3 +111,18 @@ receive skill paths via `RELAY_SKILLS_*` env vars. See [skills-bridge.md](./skil
 Set `RELAY_MOCK_DRIVER=1` to run the orchestrator with a deterministic mock harness (no
 real agent CLIs). The fusion E2E test in `fixtures/minimal-relay/e2e/fusion.test.ts`
 exercises prompt → plan → step events this way.
+
+### Live harness E2E (local only)
+
+Skip in CI by default. Requires at least one installed harness CLI (`claude`, `codex`,
+`cursor-agent`, or authed `pi`):
+
+```bash
+pnpm test:live-e2e
+# or:
+RELAY_LIVE_E2E=1 pnpm --filter @relay/orchestrator exec vitest run ../../fixtures/minimal-relay/e2e/live-fusion.test.ts
+```
+
+The test detects which harness is runnable, runs `Create hello.sh printing hello`, and
+asserts `hello.sh` exists plus `events.jsonl` contains `harness_complete` and
+`routing_outcome`.

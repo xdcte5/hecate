@@ -5,11 +5,12 @@ import {
   type HarnessId,
   type SessionPolicy,
 } from "@relay/schema";
+import { loadRelayConfig } from "@relay/registry";
 import {
-  loadRelayConfig,
-  ThinRouter,
-  type SelectHarnessResult,
-} from "@relay/registry";
+  resolveHandoffRouting,
+  type HandoffRoutingResult,
+} from "../routing/blended.js";
+import { formatRouteReason } from "../routing/diagnostics.js";
 import {
   captureGitSnapshot,
   getHandoffPath,
@@ -34,13 +35,8 @@ export function parseHandoffTarget(to: string): HandoffTarget {
   return parsed.data;
 }
 
-export function formatRoutingReason(result: SelectHarnessResult): string {
-  switch (result.reason) {
-    case "ability-match":
-      return `ability-match (score: ${result.score ?? 0})`;
-    case "failover":
-      return "failover";
-  }
+export function formatRoutingReason(result: HandoffRoutingResult): string {
+  return formatRouteReason(result);
 }
 
 /** When auto picks the active harness, advance to the next failover target. */
@@ -68,10 +64,9 @@ export async function resolveAutoHandoffTarget(
   cwd: string,
   goal: string,
   currentHarness?: HarnessId,
-): Promise<{ harness: HarnessId; routing: SelectHarnessResult; policy: SessionPolicy; rotated: boolean }> {
+): Promise<{ harness: HarnessId; routing: HandoffRoutingResult; policy: SessionPolicy; rotated: boolean }> {
   const { registry, sessionPolicy } = await loadRelayConfig(cwd);
-  const router = new ThinRouter(registry, sessionPolicy);
-  const routing = router.selectHarnessDetailed(goal);
+  const routing = await resolveHandoffRouting(cwd, goal, registry, sessionPolicy);
   const harness = rotateAwayFromCurrent(
     routing.harness,
     currentHarness,

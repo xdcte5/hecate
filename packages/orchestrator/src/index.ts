@@ -1,8 +1,30 @@
 export { buildRunPlan, groupStepsByWave } from "./plan.js";
 export { executePlan, type ExecutePlanOptions, type ExecutePlanResult } from "./execute-plan.js";
 export { verifyImplementWave, listChangedFiles, resolveTestCommand, runTestGate } from "./verify.js";
+export { runVerifiers, verifyThenAct } from "./verifiers/index.js";
+export { runVerifierGraph, synthesizeVerifierResults } from "./graph/index.js";
+export type {
+  ClaimVerdict,
+  GateVerdict,
+  VerifierResult,
+  VerifierSpec,
+  VerifierStatus,
+} from "./verifiers/index.js";
+export type {
+  GraphExecutionOptions,
+  GraphExecutionResult,
+  GraphNode,
+  GraphNodeResult,
+  GraphNodeType,
+  VerifierSpecRunner,
+} from "./graph/index.js";
 export { resolveHarnessBinary } from "./resolve-binary.js";
 export { resolveHarnessWithFallback, resolveHarnessWithFallbackFromConfig } from "./resolve-fallback.js";
+export {
+  isHarnessRunnable,
+  filterRunnableHarnesses,
+  type HarnessEligibilityContext,
+} from "./harness-eligibility.js";
 export { filterEnabledAgents, syncEnabledAgentsWithInstalled } from "./filter-agents.js";
 export { launchHarness, formatManualLaunch } from "./launcher.js";
 export { runHarnessAuto } from "./auto-run.js";
@@ -15,11 +37,18 @@ export {
   makeStepEndEvent,
   makePlanEvent,
   makeErrorEvent,
+  makeUsageEvent,
   HarnessEventEmitter,
   type PiRpcEvent,
   type HarnessEventHandler,
 } from "./events.js";
-export { suggestFailoverRetry, applyFailoverRetry, type FailoverRetrySuggestion } from "./replan.js";
+export {
+  suggestFailoverRetry,
+  applyFailoverRetry,
+  suggestVerifyRetry,
+  applyVerifyRetry,
+  type FailoverRetrySuggestion,
+} from "./replan.js";
 export { refinePlanWithLlm, type PlannerOptions } from "./planner.js";
 export { createSteerQueue, SteerQueue } from "./steer-queue.js";
 export {

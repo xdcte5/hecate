@@ -1,6 +1,14 @@
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { formatHarnessEventLine } from "./events.js";
-import { diffChangedFiles, hasDeferredApproval } from "./outcome.js";
+import {
+  diffChangedFiles,
+  hasDeferredApproval,
+  snapshotWorkingTree,
+  verifyWriteOutcome,
+} from "./outcome.js";
 
 describe("hasDeferredApproval", () => {
   it("detects approval-gated agent output", () => {
@@ -17,6 +25,20 @@ describe("diffChangedFiles", () => {
     const before = " M old.ts\n?? new.ts";
     const after = " M old.ts\n M changed.ts\n?? new.ts";
     expect(diffChangedFiles(before, after)).toEqual(["changed.ts"]);
+  });
+});
+
+describe("verifyWriteOutcome", () => {
+  it("detects files created in a non-git project", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "relay-outcome-non-git-"));
+    const before = await snapshotWorkingTree(cwd);
+
+    await writeFile(join(cwd, "created-by-agent.txt"), "hello", "utf8");
+
+    const result = await verifyWriteOutcome(cwd, "done", before);
+
+    expect(result.ok).toBe(true);
+    expect(result.filesTouched).toEqual(["created-by-agent.txt"]);
   });
 });
 

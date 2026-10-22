@@ -36,7 +36,7 @@ describe("resolveAutoHandoffTarget", () => {
     );
 
     expect(harness).toBe("cursor");
-    expect(formatRoutingReason(routing)).toContain("ability-match");
+    expect(["blended", "ability-match"]).toContain(routing.reason);
   });
 
   it("routes write unit tests to codex", async () => {
@@ -53,6 +53,16 @@ describe("resolveAutoHandoffTarget", () => {
 
     expect(harness).toBe("claude-code");
     expect(rotated).toBe(true);
+  });
+
+  it("formats blended routing reason when mode is auto", async () => {
+    const { routing } = await resolveAutoHandoffTarget(fixtureRoot, "fix React component");
+    const reason = formatRoutingReason(routing);
+
+    expect(["blended", "ability-match", "routing-rule"]).toContain(routing.reason);
+    if (routing.reason === "blended") {
+      expect(reason).toMatch(/^blended \(local:[\d.]+ bench:[\d.]+ heur:[\d.]+\)$/);
+    }
   });
 });
 

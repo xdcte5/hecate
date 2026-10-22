@@ -1,8 +1,9 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { Command } from "commander";
-import { toClaudeJson, toCodexToml, toCursorJson, type McpConfig } from "@relay/adapters";
+import {
+  installMcpHarnessConfigs,
+  readCanonicalMcp,
+  withRelayServer,
+} from "@relay/adapters";
 
 /**
  * Built-in tools the relay-mcp server exposes. Kept in sync with
@@ -17,28 +18,6 @@ const RELAY_MCP_TOOLS = [
   "registry_list",
 ] as const;
 
-/** Where each harness expects its MCP config, and how to render it. */
-const MCP_TARGETS: { harness: string; path: string; render: (c: McpConfig) => string }[] = [
-  { harness: "claude-code", path: ".mcp.json", render: toClaudeJson },
-  { harness: "codex", path: ".codex/config.toml", render: toCodexToml },
-  { harness: "cursor", path: ".cursor/mcp.json", render: toCursorJson },
-  { harness: "pi", path: "mcp.json", render: toClaudeJson },
-];
-
-async function readCanonicalMcp(cwd: string): Promise<McpConfig> {
-  const path = join(cwd, "relay", "mcp.json");
-  if (!existsSync(path)) return { mcpServers: {} };
-  return JSON.parse(await readFile(path, "utf8")) as McpConfig;
-}
-
-/** Ensure the relay-mcp server itself is registered in the canonical config. */
-function withRelayServer(config: McpConfig): McpConfig {
-  if (config.mcpServers.relay) return config;
-  return {
-    mcpServers: { relay: { command: "relay-mcp", args: [] }, ...config.mcpServers },
-  };
-}
-
 export function registerMcpCommands(program: Command, getCwd: () => string): void {
   const mcp = program.command("mcp").description("MCP mesh fabric");
 
@@ -47,15 +26,14 @@ export function registerMcpCommands(program: Command, getCwd: () => string): voi
     .description("Write MCP config (incl. relay-mcp) into every harness")
     .action(async () => {
       const cwd = getCwd();
-      const config = withRelayServer(await readCanonicalMcp(cwd));
+      const result = await installMcpHarnessConfigs(cwd);
 
-      for (const target of MCP_TARGETS) {
-        const abs = join(cwd, target.path);
-        await mkdir(dirname(abs), { recursive: true });
-        await writeFile(abs, target.render(config), "utf8");
+      for (const target of result.targets) {
         console.log(`${target.harness}: ${target.path}`);
       }
-      console.log(`Installed ${Object.keys(config.mcpServers).length} MCP server(s) across ${MCP_TARGETS.length} harnesses`);
+      console.log(
+        `Installed ${result.serverCount} MCP server(s) across ${result.targets.length} harnesses`,
+      );
     });
 
   mcp

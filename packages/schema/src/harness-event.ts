@@ -113,6 +113,45 @@ export const RetryEndEventSchema = z.object({
 });
 export type RetryEndEvent = z.infer<typeof RetryEndEventSchema>;
 
+export const UsageEventSchema = z.object({
+  type: z.literal("usage"),
+  at: eventTimestamp,
+  inputTokens: z.number().int().nonnegative().optional(),
+  outputTokens: z.number().int().nonnegative().optional(),
+  costUsd: z.number().nonnegative().optional(),
+});
+export type UsageEvent = z.infer<typeof UsageEventSchema>;
+
+export const VerifyOutcomeEventSchema = z.object({
+  type: z.literal("verify_outcome"),
+  at: eventTimestamp,
+  stepId: z.string(),
+  harness: HarnessIdSchema,
+  ok: z.boolean(),
+  recommendation: z.enum(["ACT", "BLOCK", "NEEDS_HUMAN"]),
+  confidence: z.number().min(0).max(1),
+  evidence: z.string(),
+  verifierId: z.string(),
+  verifyRetries: z.number().int().nonnegative().optional(),
+  maxRetries: z.number().int().nonnegative().optional(),
+  failoverReason: z.enum(["auth", "capability", "verify", "none"]).optional(),
+  failedComponent: z.string().optional(),
+  durationMs: z.number().int().nonnegative(),
+});
+export type VerifyOutcomeEvent = z.infer<typeof VerifyOutcomeEventSchema>;
+
+export const GraphNodeEventSchema = z.object({
+  type: z.literal("graph_node"),
+  at: eventTimestamp,
+  stepId: z.string(),
+  nodeId: z.string(),
+  nodeType: z.string(),
+  ok: z.boolean(),
+  durationMs: z.number().int().nonnegative(),
+  evidence: z.string().optional(),
+});
+export type GraphNodeEvent = z.infer<typeof GraphNodeEventSchema>;
+
 export const HarnessEventSchema = z.discriminatedUnion("type", [
   StepStartEventSchema,
   StepEndEventSchema,
@@ -126,5 +165,8 @@ export const HarnessEventSchema = z.discriminatedUnion("type", [
   HandoffEventSchema,
   RetryStartEventSchema,
   RetryEndEventSchema,
+  UsageEventSchema,
+  VerifyOutcomeEventSchema,
+  GraphNodeEventSchema,
 ]);
 export type HarnessEvent = z.infer<typeof HarnessEventSchema>;

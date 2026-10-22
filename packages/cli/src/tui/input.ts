@@ -42,6 +42,9 @@ export const RELAY_COMMAND_HELP = [
   "help · quit",
 ].join(" · ");
 
+export const LOGIN_HELP =
+  "Relay uses native agent auth. Try: codex login/status, claude login or claude -p \"say hi\", pi /login or pi --help. Then run /agents.";
+
 export type SlashCommand = "steer" | "status" | "agents";
 
 export type ParsedInput =
@@ -106,10 +109,12 @@ function parseSlashCommand(trimmed: string): ParsedInput | null {
     case "model":
       if (!args) return { kind: "hint", message: "Usage: /model <model-name>" };
       return { kind: "model", model: args };
+    case "login":
+      return { kind: "hint", message: LOGIN_HELP };
     default:
       return {
         kind: "hint",
-        message: `Unknown command /${command} — try /status, /agents, /harness, /model, /steer`,
+        message: `Unknown command /${command} — try /status, /agents, /harness, /model, /login, /steer`,
       };
   }
 }

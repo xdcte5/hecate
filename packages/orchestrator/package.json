@@ -21,6 +21,7 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
+    "test:live-e2e": "RELAY_LIVE_E2E=1 vitest run ../../fixtures/minimal-relay/e2e/live-fusion.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },

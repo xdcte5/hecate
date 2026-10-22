@@ -2,3 +2,11 @@ node_modules/
 dist/
 *.tsbuildinfo
 .relay/
+__pycache__/
+*.pyc
+
+# Local mini-bench / Harbor run artifacts (keep scripts + summary jsonl only)
+jobs/mini-bench/**/runs/
+jobs/mini-bench/**/runs-usage/
+jobs/mini-bench/tb-*/
+jobs/mini-bench/**/*.log

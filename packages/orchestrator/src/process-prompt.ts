@@ -4,6 +4,8 @@ import type { HarnessId } from "@relay/schema";
 import { SessionStore } from "@relay/session";
 import { executePlan } from "./execute-plan.js";
 import { filterEnabledAgents, syncEnabledAgentsWithInstalled } from "./filter-agents.js";
+import type { HarnessEligibilityContext } from "./harness-eligibility.js";
+import { filterRunnableHarnesses } from "./harness-eligibility.js";
 import type { HarnessEvent } from "@relay/schema";
 import { buildRunPlan } from "./plan.js";
 import { initRunState, saveRunState, loadRunState } from "./runner-state.js";
@@ -47,6 +49,17 @@ function formatStepModel(step: RunStep): string {
   if (!step.model) return "";
   const short = formatModelLabel(step.model);
   return ` — model: ${step.model} (${short})`;
+}
+
+function formatRouteBreakdown(step: RunStep): string {
+  if (!step.routeBreakdown) return "";
+  const local =
+    step.routeBreakdown.local !== undefined
+      ? `local ${(step.routeBreakdown.local * 100).toFixed(0)}%`
+      : "";
+  const winner = step.routeBreakdown.winner ? `→ ${step.routeBreakdown.winner}` : "";
+  const bits = [local, winner].filter(Boolean);
+  return bits.length > 0 ? ` [${bits.join(", ")}]` : "";
 }
 
 function push(
@@ -95,17 +108,26 @@ export async function processPrompt(
       ])
     : [undefined, []];
 
+  const eligibilityCtx: HarnessEligibilityContext = {
+    installed: installedAgents,
+    piAuthProviders: piAuthProviders ? new Set([...piAuthProviders].map(String)) : undefined,
+    piListedModels,
+  };
+  const runnableFailover = filterRunnableHarnesses(failover, eligibilityCtx);
+
   const registryForRouter =
     effectiveEnabled && effectiveEnabled.length > 0
       ? { harnesses: registry.harnesses.filter((card) => effectiveEnabled.includes(card.id)) }
       : registry;
   const router = new ThinRouter(
     registryForRouter,
-    { ...sessionPolicy, failover },
+    { ...sessionPolicy, failover: runnableFailover },
     {
       piAuthProviders: piAuthProviders ? new Set([...piAuthProviders].map(String)) : undefined,
       piListedModels,
+      installedHarnesses: installedAgents,
     },
+    cwd,
   );
   const store = new SessionStore({ rootDir: cwd });
 
@@ -115,7 +137,7 @@ export async function processPrompt(
     push(lines, `Session: "${trimmed}"`, onLine);
   }
 
-  const plan = buildRunPlan(trimmed, router);
+  const plan = buildRunPlan(trimmed, router, { ...sessionPolicy, failover: runnableFailover });
   const steps: RunStep[] = plan.steps.map((step) => {
     const harness = harnessOverride ?? step.harness;
     const override = modelOverrides?.[harness] ?? nextModelOverride;
@@ -152,10 +174,11 @@ export async function processPrompt(
     push(lines, `  Wave ${wave}${parallel}:`, onLine, planToScreen);
     for (const s of waveSteps) {
       const reason =
-        s.reason === "ability-match" ? "ability-match" : "default failover";
+        s.routeReason ??
+        (s.reason === "ability-match" ? "ability-match" : "default failover");
       push(
         lines,
-        `    • ${label(s.harness)} (${reason})${formatStepModel(s)} — ${s.task}`,
+        `    • ${label(s.harness)} (${reason})${formatStepModel(s)}${formatRouteBreakdown(s)} — ${s.task}`,
         onLine,
         planToScreen,
       );
@@ -180,9 +203,12 @@ export async function processPrompt(
     state,
     store,
     registry,
-    failover,
+    failover: runnableFailover,
+    installedAgents,
+    eligibilityCtx,
     sessionPolicy,
     modelOverrides,
+    router,
     piAuthProviders: piAuthProviders ? new Set([...piAuthProviders].map(String)) : undefined,
     piListedModels,
     onLine: (line) => {

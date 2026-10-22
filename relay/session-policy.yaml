@@ -1,6 +1,18 @@
 # Routing is ability-based via harness cards in registry.yaml.
 # Optional overrides — leave empty to route from strengths/weaknesses + task analysis.
+# Explicit routing[] entries always win over routing_config blended selection.
 routing: []
+
+# Blended routing: local history + benchmark priors + heuristic router.
+routing_config:
+  mode: auto
+  min_local_samples: 5
+  min_success_rate: 0.3
+  blend:
+    local: 0.425
+    benchmark: 0.2125
+    heuristic: 0.2125
+    cost: 0.15
 
 # Failover order breaks ability-score ties (first match wins).
 # Pi is first so implement steps prefer Pi when harnesses score equally.
@@ -9,6 +21,18 @@ failover:
   - cursor
   - claude-code
   - codex
+
+# Per-step harness preference — checked before global failover when routing plan steps.
+step_routing:
+  implement:
+    prefer: [claude-code, codex, pi]
+  test:
+    prefer: [codex, claude-code]
+  review:
+    prefer: [claude-code]
+    model_tier: capable
+  debug:
+    prefer: [codex, pi]
 
 governance:
   requireGitSnapshotOnHandoff: true

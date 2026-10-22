@@ -7,6 +7,7 @@ import {
   makePlanEvent,
   makeStepEndEvent,
   makeStepStartEvent,
+  makeUsageEvent,
   mapPiEventToHarnessEvent,
 } from "./events.js";
 
@@ -92,6 +93,45 @@ describe("formatHarnessEventLine", () => {
     expect(
       formatHarnessEventLine(makeStepEndEvent({ id: "implement", harness: "pi" }, true, "done")),
     ).toBe("  ✓ done");
+    expect(formatHarnessEventLine(makeUsageEvent({ inputTokens: 10, outputTokens: 5 }))).toBeNull();
+  });
+
+  it("formats graph verifier node outcomes", () => {
+    expect(
+      formatHarnessEventLine({
+        type: "graph_node",
+        at,
+        stepId: "implement",
+        nodeId: "artifact-check",
+        nodeType: "artifact",
+        ok: true,
+        durationMs: 23,
+        evidence: "Validated dist output.",
+      }),
+    ).toBe("graph PASS artifact-check (artifact, 23ms): Validated dist output.");
+
+    expect(
+      formatHarnessEventLine({
+        type: "graph_node",
+        at,
+        stepId: "implement",
+        nodeId: "policy-check",
+        nodeType: "policy",
+        ok: false,
+        durationMs: 5,
+      }),
+    ).toBe("graph FAIL policy-check (policy, 5ms)");
+  });
+});
+
+describe("makeUsageEvent", () => {
+  it("builds a usage event with optional fields", () => {
+    expect(makeUsageEvent({ inputTokens: 100, outputTokens: 20, costUsd: 0.01 })).toMatchObject({
+      type: "usage",
+      inputTokens: 100,
+      outputTokens: 20,
+      costUsd: 0.01,
+    });
   });
 });
 

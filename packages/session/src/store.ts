@@ -12,13 +12,20 @@ import {
   handoffPath,
   sessionPath,
 } from "./paths.js";
-import { buildHandoffArtifacts } from "./rhp-builder.js";
+import { buildHandoffArtifacts, type HandoffBuildOptions, type HandoffTier } from "./rhp-builder.js";
 import { setActiveSessionId } from "./relay-config.js";
+import { loadSessionPolicyGovernance } from "./session-policy.js";
 
 export type SessionStoreOptions = {
   rootDir?: string;
   defaultHarness?: HarnessId;
   includeGitDiffs?: boolean;
+};
+
+export type PrepareHandoffOptions = {
+  tier?: HandoffTier;
+  maxTokens?: number;
+  testHint?: string;
 };
 
 export type AgentProgress = {
@@ -147,12 +154,24 @@ export class SessionStore {
     return updated;
   }
 
-  async prepareHandoff(id: string, to: HarnessId): Promise<HandoffBundle> {
+  async prepareHandoff(
+    id: string,
+    to: HarnessId,
+    options: PrepareHandoffOptions = {},
+  ): Promise<HandoffBundle> {
     const session = await this.requireSession(id);
-    const git = await captureGitSnapshot(this.rootDir, {
-      includeDiffs: this.includeGitDiffs,
-    });
-    const artifacts = buildHandoffArtifacts(session, to, git ?? undefined);
+    const tier = options.tier ?? "full";
+    const governance = await loadSessionPolicyGovernance(this.rootDir);
+    const maxTokens = options.maxTokens ?? governance.maxHandoffTokens;
+    const includeDiffs = tier === "full" && this.includeGitDiffs;
+
+    const git = await captureGitSnapshot(this.rootDir, { includeDiffs });
+    const buildOptions: HandoffBuildOptions = {
+      tier,
+      maxTokens,
+      ...(options.testHint ? { testHint: options.testHint } : {}),
+    };
+    const artifacts = buildHandoffArtifacts(session, to, git ?? undefined, buildOptions);
 
     const now = new Date().toISOString();
     const sourceHarness = session.activeHarness;

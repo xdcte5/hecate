@@ -1,0 +1,9 @@
+{"agent": "claude", "task_id": "A", "wall_s": 21.36, "exit_code": 0, "success": true, "verify": "hello.sh ok"}
+{"agent": "claude", "task_id": "B", "wall_s": 17.21, "exit_code": 0, "success": true, "verify": "add fixed"}
+{"agent": "claude", "task_id": "C", "wall_s": 16.42, "exit_code": 0, "success": true, "verify": "fib ok"}
+{"agent": "codex", "task_id": "A", "wall_s": 53.46, "exit_code": 0, "success": true, "verify": "hello.sh ok"}
+{"agent": "codex", "task_id": "B", "wall_s": 279.96, "exit_code": 0, "success": true, "verify": "add fixed"}
+{"agent": "codex", "task_id": "C", "wall_s": 45.66, "exit_code": 0, "success": true, "verify": "fib ok"}
+{"agent": "relay", "task_id": "A", "wall_s": 98.04, "exit_code": 1, "success": true, "verify": "hello.sh ok"}
+{"agent": "relay", "task_id": "B", "wall_s": 59.01, "exit_code": 1, "success": true, "verify": "add fixed"}
+{"agent": "relay", "task_id": "C", "wall_s": 33.33, "exit_code": 1, "success": true, "verify": "fib ok"}

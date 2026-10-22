@@ -84,7 +84,11 @@ describe("resolveTestCommand", () => {
     );
     expect(
       await resolveTestCommand(dir, {
-        sessionPolicy: { routing: [], failover: ["pi"], verification: { enableTestGate: false } },
+        sessionPolicy: {
+          routing: [],
+          failover: ["pi"],
+          verification: { enableTestGate: false, maxStepRetries: 3 },
+        },
       }),
     ).toBeNull();
   });

@@ -23,6 +23,10 @@ describe("parseInputCommand", () => {
     });
     expect(parseInputCommand("/harness pi")).toEqual({ kind: "harness", harness: "pi" });
     expect(parseInputCommand("/model gpt-4o")).toEqual({ kind: "model", model: "gpt-4o" });
+    expect(parseInputCommand("/login")).toEqual({
+      kind: "hint",
+      message: expect.stringContaining("pi"),
+    });
   });
 
   it("parses tui commands without treating them as goals", () => {

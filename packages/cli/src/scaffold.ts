@@ -87,9 +87,19 @@ rules, Pi overlay). Edit \`relay/\`, never the generated output.
 
 export const DEFAULT_POLICY = {
   routing: [],
+  routing_config: {
+    mode: "auto" as const,
+    min_local_samples: 5,
+    blend: { local: 0.425, benchmark: 0.2125, heuristic: 0.2125, cost: 0.15 },
+  },
   // Pi first — breaks ability-score ties for implement steps.
   failover: ["pi", "cursor", "claude-code", "codex"],
   governance: { requireGitSnapshotOnHandoff: true, maxHandoffTokens: 8000, maxTranscriptLines: 200 },
+};
+
+export const DEFAULT_ROUTING_PRIORS = {
+  version: "1",
+  task_types: {},
 };
 
 /** Create relay/ directories and any of the base config files not already present. */
@@ -112,4 +122,5 @@ export async function writeBaseScaffold(
   await write("instructions.md", DEFAULT_INSTRUCTIONS);
   await write("registry.yaml", stringifyYaml({ harnesses: cards }));
   await write("session-policy.yaml", stringifyYaml(DEFAULT_POLICY));
+  await write("routing-priors.yaml", stringifyYaml(DEFAULT_ROUTING_PRIORS));
 }
